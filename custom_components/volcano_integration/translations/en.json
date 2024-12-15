@@ -1,0 +1,10 @@
+{
+  "title": "Volcano Integration",
+  "step": {
+    "user": {
+      "title": "Set up Volcano Integration",
+      "description": "Chuffnugget."
+    }
+  },
+  "flow_title": "Volcano Integration Setup"
+}
