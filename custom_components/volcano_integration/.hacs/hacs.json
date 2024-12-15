@@ -1,0 +1,9 @@
+{
+  "name": "Volcano Integration",
+  "domain": "volcano_integration",
+  "homeassistant": "2021.11.0",
+  "country": "us",
+  "codeowners": ["@Chuffnugget"],
+  "documentation": "https://github.com/Chuffnugget/volcano_integration",
+  "integration_type": "integration"
+}
