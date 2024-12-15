@@ -2,10 +2,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from .const import DOMAIN
 
-# Import platforms explicitly to avoid blocking in async_forward_entry_setups
-from . import sensor
-from . import button
-
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the integration without configuration entries."""
     hass.data[DOMAIN] = {}
@@ -13,7 +9,6 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the integration using a configuration entry."""
-    # Import platforms explicitly to avoid blocking calls during async_forward_entry_setups
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "button"])
     return True
 
