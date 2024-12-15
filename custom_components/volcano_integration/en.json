@@ -1,9 +1,0 @@
-{
-  "title": "Volcano Integration",
-  "step": {
-    "user": {
-      "title": "Configure Volcano Integration",
-      "description": "Set up the Volcano Integration."
-    }
-  }
-}
