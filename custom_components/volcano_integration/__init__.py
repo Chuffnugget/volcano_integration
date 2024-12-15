@@ -1,41 +1,20 @@
-# Import asyncio for asynchronous tasks and HomeAssistant core for integration setup
-import asyncio
+# __init__.py
 from homeassistant.core import HomeAssistant
-from .const import DOMAIN  # Import the DOMAIN constant
+from .const import DOMAIN
 
-# Asynchronous setup function called when the integration is loaded
 async def async_setup(hass: HomeAssistant, config: dict):
-    """
-    Initializes the Volcano Integration without configuration entries.
-
-    :param hass: HomeAssistant core object
-    :param config: Configuration dictionary
-    """
-    hass.data[DOMAIN] = {}  # Create a dictionary to store integration-related data
-    return True  # Indicate successful setup
-
-# Asynchronous setup function for configuration entries
-async def async_setup_entry(hass: HomeAssistant, entry):
-    """
-    Setup integration using the configuration entry.
-
-    :param hass: HomeAssistant core object
-    :param entry: Configuration entry created by the user
-    """
-    # Forward configuration to specific platforms
-    hass.async_create_task(hass.config_entries.async_forward_entry_setup(entry, "sensor"))
-    hass.async_create_task(hass.config_entries.async_forward_entry_setup(entry, "button"))
+    """Set up the integration without configuration entries."""
+    hass.data[DOMAIN] = {}
     return True
 
-# Asynchronous function to unload the integration when removed
-async def async_unload_entry(hass: HomeAssistant, entry):
-    """
-    Clean up resources when the configuration entry is removed.
+async def async_setup_entry(hass: HomeAssistant, entry):
+    """Set up the integration using a configuration entry."""
+    # Use async_forward_entry_setups to forward setup to platforms
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "button"])
+    return True
 
-    :param hass: HomeAssistant core object
-    :param entry: Configuration entry to be removed
-    """
-    # Unload the sensor and button platforms
+async def async_unload_entry(hass: HomeAssistant, entry):
+    """Unload a configuration entry."""
     await hass.config_entries.async_forward_entry_unload(entry, "sensor")
     await hass.config_entries.async_forward_entry_unload(entry, "button")
     return True
