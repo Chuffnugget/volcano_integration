@@ -1,0 +1,4 @@
+start_random_number:
+  description: "Start the random number generator"
+stop_random_number:
+  description: "Stop the random number generator"
