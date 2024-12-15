@@ -1,19 +1,14 @@
-# Import required modules for button entities
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.components.button import ButtonEntity
+from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 
-# Define a button to start the random number generator
 class StartRandomNumberButton(ButtonEntity):
-    """
-    Button to start the random number generator.
-    """
+    """Button to start the random number generator."""
 
     def __init__(self, hass):
-        """
-        Initialize the button.
-
-        :param hass: HomeAssistant core object
-        """
+        """Initialize the button."""
         self._hass = hass
 
     @property
@@ -22,27 +17,17 @@ class StartRandomNumberButton(ButtonEntity):
         return "Start Random Number Generator"
 
     async def async_press(self):
-        """
-        Handle button press to start the random number generator.
-        """
+        """Handle button press to start the generator."""
         sensor = self._hass.data[DOMAIN].get("sensor")
         if sensor:
             sensor._running = True
-            # Restart the random number generator loop
             self._hass.loop.create_task(sensor._generate_random_number())
 
-# Define a button to stop the random number generator
 class StopRandomNumberButton(ButtonEntity):
-    """
-    Button to stop the random number generator.
-    """
+    """Button to stop the random number generator."""
 
     def __init__(self, hass):
-        """
-        Initialize the button.
-
-        :param hass: HomeAssistant core object
-        """
+        """Initialize the button."""
         self._hass = hass
 
     @property
@@ -51,9 +36,11 @@ class StopRandomNumberButton(ButtonEntity):
         return "Stop Random Number Generator"
 
     async def async_press(self):
-        """
-        Handle button press to stop the random number generator.
-        """
+        """Handle button press to stop the generator."""
         sensor = self._hass.data[DOMAIN].get("sensor")
         if sensor:
             sensor.stop()
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+    """Set up the button platform for the integration."""
+    async_add_entities([StartRandomNumberButton(hass), StopRandomNumberButton(hass)])
