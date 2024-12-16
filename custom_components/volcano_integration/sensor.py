@@ -44,7 +44,7 @@ class BluetoothQueue:
         while True:
             uuid, future = await self.queue.get()
             try:
-                value = await self.client.read_gatt_char(uuid)
+                value = await asyncio.wait_for(self.client.read_gatt_char(uuid), timeout=10)
                 future.set_result(value)
                 _LOGGER.debug("Successfully read UUID %s: %s", uuid, value)
             except Exception as e:
@@ -76,14 +76,6 @@ class VolcanoTemperatureSensor(SensorEntity):
         """Return the current temperature."""
         return self._state
 
-    @property
-    def device_class(self):
-        return "temperature"
-
-    @property
-    def unit_of_measurement(self):
-        return "°C"
-
     async def async_added_to_hass(self):
         """Start periodic temperature updates."""
         self._hass.loop.create_task(self._periodic_update())
@@ -102,70 +94,27 @@ class VolcanoTemperatureSensor(SensorEntity):
             await asyncio.sleep(0.5)
 
 
-class VolcanoSettingsSensor(SensorEntity):
-    """Sensor for on-demand settings."""
-
-    def __init__(self, hass: HomeAssistant, name: str, uuid: str, decode):
-        """Initialize the settings sensor."""
-        self._hass = hass
-        self._name = name
-        self._uuid = uuid
-        self._decode = decode
-        self._state = None
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self):
-        """Return the current state."""
-        return self._state
-
-    async def fetch_setting(self):
-        """Fetch the sensor value."""
-        queue: BluetoothQueue = self._hass.data[DOMAIN]["bluetooth_queue"]
-        try:
-            value = await queue.read_gatt_char(self._uuid)
-            self._state = self._decode(value)
-            self.async_write_ha_state()
-            _LOGGER.info("Updated %s: %s", self._name, self._state)
-        except Exception as e:
-            _LOGGER.error("Error fetching %s: %s", self._name, e)
-
-
-async def fetch_settings(hass: HomeAssistant):
-    """Fetch all settings values."""
-    sensors = hass.data[DOMAIN].get("settings_sensors", [])
-    for sensor in sensors:
-        try:
-            await sensor.fetch_setting()
-            _LOGGER.info("Fetched value for %s", sensor.name)
-        except Exception as e:
-            _LOGGER.error("Error fetching value for %s: %s", sensor.name, e)
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up sensors for the integration."""
     client = hass.data[DOMAIN].get("bluetooth_client")
     if client is None:
-        client = BleakClient(ADDRESS)
-        await client.connect()
-        hass.data[DOMAIN]["bluetooth_client"] = client
-        _LOGGER.info("Bluetooth connected to %s", ADDRESS)
+        try:
+            client = BleakClient(ADDRESS)
+            await asyncio.wait_for(client.connect(), timeout=10)
+            hass.data[DOMAIN]["bluetooth_client"] = client
+            _LOGGER.info("Bluetooth connected to %s", ADDRESS)
+        except Exception as e:
+            _LOGGER.error("Failed to connect to Bluetooth device: %s", e)
+            return  # Stop setup if the connection fails
 
     # Start the Bluetooth queue
     bluetooth_queue = BluetoothQueue(client)
     hass.data[DOMAIN]["bluetooth_queue"] = bluetooth_queue
     await bluetooth_queue.start()
 
-    # Create sensors
+    # Add the temperature sensor
     temperature_sensor = VolcanoTemperatureSensor(hass)
-    settings_sensors = [
-        VolcanoSettingsSensor(hass, sensor["name"], sensor["uuid"], sensor["decode"])
-        for sensor in SETTINGS_SENSORS
-    ]
-    hass.data[DOMAIN]["settings_sensors"] = settings_sensors
+    async_add_entities([temperature_sensor])
 
-    async_add_entities([temperature_sensor] + settings_sensors)
+    # Log completion of setup
+    _LOGGER.info("Volcano integration setup complete.")
