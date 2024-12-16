@@ -3,9 +3,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
 from bleak import BleakClient
-import logging
 from .sensor import fetch_settings
 from .const import DOMAIN
+
+import logging
 
 ADDRESS = "CE:9E:A6:43:25:F3"  # Bluetooth device address
 
@@ -15,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 class ConnectBluetoothButton(ButtonEntity):
     """Button to connect to the Bluetooth device."""
 
-    def __init__(self, hass):
+    def __init__(self, hass: HomeAssistant):
         """Initialize the button."""
         self._hass = hass
 
@@ -36,6 +37,11 @@ class ConnectBluetoothButton(ButtonEntity):
             self._hass.data[DOMAIN]["bluetooth_client"] = client
             _LOGGER.info("Connected to Bluetooth device at %s", ADDRESS)
 
+            # Start Bluetooth queue
+            queue = BluetoothQueue(client)
+            self._hass.data[DOMAIN]["bluetooth_queue"] = queue
+            await queue.start()
+
         except Exception as e:
             _LOGGER.error("Failed to connect to Bluetooth device: %s", e)
             self._hass.data[DOMAIN]["bluetooth_client"] = None
@@ -44,7 +50,7 @@ class ConnectBluetoothButton(ButtonEntity):
 class DisconnectBluetoothButton(ButtonEntity):
     """Button to disconnect from the Bluetooth device."""
 
-    def __init__(self, hass):
+    def __init__(self, hass: HomeAssistant):
         """Initialize the button."""
         self._hass = hass
 
