@@ -2,7 +2,15 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
+from bleak import BleakClient
+import logging
 from .const import DOMAIN
+from .sensor import fetch_settings
+
+ADDRESS = "CE:9E:A6:43:25:F3"  # Bluetooth device address
+
+_LOGGER = logging.getLogger(__name__)
+
 
 class ConnectBluetoothButton(ButtonEntity):
     """Button to connect to the Bluetooth device."""
@@ -18,9 +26,30 @@ class ConnectBluetoothButton(ButtonEntity):
 
     async def async_press(self):
         """Handle button press to connect."""
-        sensor = self._hass.data[DOMAIN].get("sensor")
-        if sensor:
-            await sensor.connect()
+        if self._hass.data[DOMAIN].get("bluetooth_client") is not None:
+            _LOGGER.warning("Bluetooth is already connected.")
+            return
+
+        try:
+            client = BleakClient(ADDRESS)
+            await client.connect()
+            self._hass.data[DOMAIN]["bluetooth_client"] = client
+            _LOGGER.info("Connected to Bluetooth device at %s", ADDRESS)
+
+            # Update the status sensor
+            status_sensor = self._hass.data[DOMAIN].get("status_sensor")
+            if status_sensor:
+                status_sensor.set_running(True)
+
+            # Start fetching temperature
+            temperature_sensor = self._hass.data[DOMAIN].get("temperature_sensor")
+            if temperature_sensor:
+                _LOGGER.info("Starting temperature updates.")
+                # No action needed; temperature sensor updates automatically
+
+        except Exception as e:
+            _LOGGER.error("Failed to connect to Bluetooth device: %s", e)
+            self._hass.data[DOMAIN]["bluetooth_client"] = None
 
 
 class DisconnectBluetoothButton(ButtonEntity):
@@ -37,11 +66,73 @@ class DisconnectBluetoothButton(ButtonEntity):
 
     async def async_press(self):
         """Handle button press to disconnect."""
-        sensor = self._hass.data[DOMAIN].get("sensor")
-        if sensor:
-            await sensor.disconnect()
+        client = self._hass.data[DOMAIN].get("bluetooth_client")
+        if client is not None and client.is_connected:
+            await client.disconnect()
+            _LOGGER.info("Disconnected from Bluetooth device at %s", ADDRESS)
+            self._hass.data[DOMAIN]["bluetooth_client"] = None
+
+            # Update the status sensor
+            status_sensor = self._hass.data[DOMAIN].get("status_sensor")
+            if status_sensor:
+                status_sensor.set_running(False)
+        else:
+            _LOGGER.warning("Bluetooth is already disconnected.")
+
+
+class GetSettingsButton(ButtonEntity):
+    """Button to fetch settings values."""
+
+    def __init__(self, hass: HomeAssistant):
+        """Initialize the button."""
+        self._hass = hass
+
+    @property
+    def name(self):
+        """Return the name of the button."""
+        return "Get Settings"
+
+    async def async_press(self):
+        """Handle button press to fetch settings."""
+        _LOGGER.info("Fetching settings values...")
+        await fetch_settings(self._hass)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up the buttons."""
-    async_add_entities([ConnectBluetoothButton(hass), DisconnectBluetoothButton(hass)])
+    # Create the status sensor and store it
+    status_sensor = VolcanoStatusSensor(hass)
+    hass.data[DOMAIN]["status_sensor"] = status_sensor
+
+    # Add buttons and status sensor
+    async_add_entities([
+        ConnectBluetoothButton(hass),
+        DisconnectBluetoothButton(hass),
+        GetSettingsButton(hass),
+        status_sensor
+    ])
+
+
+class VolcanoStatusSensor(ButtonEntity):
+    """Sensor to represent the Bluetooth connection status."""
+
+    def __init__(self, hass: HomeAssistant):
+        """Initialize the status sensor."""
+        self._hass = hass
+        self._state = "Disconnected"
+
+    @property
+    def name(self):
+        """Return the name of the status sensor."""
+        return "Volcano Bluetooth Status"
+
+    @property
+    def state(self):
+        """Return the current connection status."""
+        return self._state
+
+    def set_running(self, running: bool):
+        """Update the status based on the connection."""
+        self._state = "Connected" if running else "Disconnected"
+        self.async_write_ha_state()
+        _LOGGER.info("Bluetooth status updated: %s", self._state)
