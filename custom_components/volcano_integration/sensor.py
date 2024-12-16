@@ -64,7 +64,7 @@ class VolcanoTemperatureSensor(SensorEntity):
                     value = await client.read_gatt_char(TEMPERATURE_UUID)
                     self._state = int.from_bytes(value, byteorder="little") / 10.0
                     self.async_write_ha_state()
-                    _LOGGER.debug("Updated Current Temperature: %.1f °C", self._state)
+                    _LOGGER.info("Updated Current Temperature: %.1f °C", self._state)
                 except Exception as e:
                     _LOGGER.error("Error reading temperature: %s", e)
             await asyncio.sleep(0.5)
@@ -104,19 +104,52 @@ class VolcanoToggleSensor(SensorEntity):
                     on_value = await client.read_gatt_char(self._on_uuid)
                     off_value = await client.read_gatt_char(self._off_uuid)
 
-                    # Determine the state based on the values
-                    if on_value == bytearray([0x01]) and off_value == bytearray([0x00]):
-                        self._state = "On"
-                    elif on_value == bytearray([0x00]) and off_value == bytearray([0x01]):
-                        self._state = "Off"
-                    else:
-                        self._state = "Unknown"
+                    if self._name == "Volcano Fan":
+                        self._state = "On" if on_value == bytearray([0x01]) else "Off"
+
+                    elif self._name == "Volcano Heat":
+                        if off_value == bytearray([0x01]):
+                            self._state = "Off"
+                        elif on_value == bytearray([0x01]):
+                            self._state = "On"
+                        else:
+                            self._state = "Unknown"
 
                     self.async_write_ha_state()
-                    _LOGGER.debug("Updated %s: %s", self._name, self._state)
+                    _LOGGER.info("Updated %s: %s", self._name, self._state)
+
                 except Exception as e:
                     _LOGGER.error("Error updating %s: %s", self._name, e)
             await asyncio.sleep(0.5)
+
+
+class VolcanoStatusSensor(SensorEntity):
+    """Sensor to represent the Bluetooth connection status."""
+
+    def __init__(self, hass: HomeAssistant):
+        """Initialize the status sensor."""
+        self._hass = hass
+        self._state = "Disconnected"
+
+    @property
+    def name(self):
+        """Return the name of the sensor."""
+        return "Volcano Bluetooth Status"
+
+    @property
+    def state(self):
+        """Return the current connection status."""
+        return self._state
+
+    async def async_added_to_hass(self):
+        """Register the status sensor."""
+        self._hass.data[DOMAIN]["status_sensor"] = self
+
+    def set_running(self, running: bool):
+        """Update the status based on the connection."""
+        self._state = "Connected" if running else "Disconnected"
+        self.async_write_ha_state()
+        _LOGGER.info("Bluetooth status updated: %s", self._state)
 
 
 class VolcanoSettingsSensor(SensorEntity):
@@ -170,6 +203,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     temperature_sensor = VolcanoTemperatureSensor(hass)
     fan_sensor = VolcanoToggleSensor(hass, "Volcano Fan", FAN_ON_UUID, FAN_OFF_UUID)
     heat_sensor = VolcanoToggleSensor(hass, "Volcano Heat", HEAT_ON_UUID, HEAT_OFF_UUID)
+    status_sensor = VolcanoStatusSensor(hass)
 
     # Create the settings sensors
     settings_sensors = [
@@ -178,4 +212,4 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ]
     hass.data[DOMAIN]["settings_sensors"] = settings_sensors
 
-    async_add_entities([temperature_sensor, fan_sensor, heat_sensor] + settings_sensors)
+    async_add_entities([temperature_sensor, fan_sensor, heat_sensor, status_sensor] + settings_sensors)
