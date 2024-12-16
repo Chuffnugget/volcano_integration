@@ -102,15 +102,15 @@ class VolcanoTemperatureSensor(SensorEntity):
             await asyncio.sleep(0.5)
 
 
-class VolcanoToggleSensor(SensorEntity):
-    """Sensor for combined on/off values (e.g., Fan, Heat)."""
+class VolcanoSettingsSensor(SensorEntity):
+    """Sensor for on-demand settings."""
 
-    def __init__(self, hass: HomeAssistant, name: str, on_uuid: str, off_uuid: str):
-        """Initialize the toggle sensor."""
+    def __init__(self, hass: HomeAssistant, name: str, uuid: str, decode):
+        """Initialize the settings sensor."""
         self._hass = hass
         self._name = name
-        self._on_uuid = on_uuid
-        self._off_uuid = off_uuid
+        self._uuid = uuid
+        self._decode = decode
         self._state = None
 
     @property
@@ -123,41 +123,31 @@ class VolcanoToggleSensor(SensorEntity):
         """Return the current state."""
         return self._state
 
-    async def async_added_to_hass(self):
-        """Start periodic updates for the toggle sensor."""
-        self._hass.loop.create_task(self._periodic_update())
-
-    async def _periodic_update(self):
-        """Periodically update the toggle sensor."""
+    async def fetch_setting(self):
+        """Fetch the sensor value."""
         queue: BluetoothQueue = self._hass.data[DOMAIN]["bluetooth_queue"]
-        while True:
-            try:
-                on_value = await queue.read_gatt_char(self._on_uuid)
-                off_value = await queue.read_gatt_char(self._off_uuid)
+        try:
+            value = await queue.read_gatt_char(self._uuid)
+            self._state = self._decode(value)
+            self.async_write_ha_state()
+            _LOGGER.info("Updated %s: %s", self._name, self._state)
+        except Exception as e:
+            _LOGGER.error("Error fetching %s: %s", self._name, e)
 
-                if self._name == "Volcano Fan":
-                    self._state = "On" if on_value == bytearray([0x01]) else "Off"
 
-                elif self._name == "Volcano Heat":
-                    if off_value == bytearray([0x01]):
-                        self._state = "Off"
-                    elif on_value == bytearray([0x01]):
-                        self._state = "On"
-                    else:
-                        self._state = "Unknown"
-
-                self.async_write_ha_state()
-                _LOGGER.info("Updated %s: %s", self._name, self._state)
-
-            except Exception as e:
-                _LOGGER.error("Error updating %s: %s", self._name, e)
-
-            await asyncio.sleep(0.5)
+async def fetch_settings(hass: HomeAssistant):
+    """Fetch all settings values."""
+    sensors = hass.data[DOMAIN].get("settings_sensors", [])
+    for sensor in sensors:
+        try:
+            await sensor.fetch_setting()
+            _LOGGER.info("Fetched value for %s", sensor.name)
+        except Exception as e:
+            _LOGGER.error("Error fetching value for %s: %s", sensor.name, e)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up sensors for the integration."""
-    # Initialize the Bluetooth client and queue
     client = hass.data[DOMAIN].get("bluetooth_client")
     if client is None:
         client = BleakClient(ADDRESS)
@@ -170,9 +160,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     hass.data[DOMAIN]["bluetooth_queue"] = bluetooth_queue
     await bluetooth_queue.start()
 
-    # Create the sensors
+    # Create sensors
     temperature_sensor = VolcanoTemperatureSensor(hass)
-    fan_sensor = VolcanoToggleSensor(hass, "Volcano Fan", FAN_ON_UUID, FAN_OFF_UUID)
-    heat_sensor = VolcanoToggleSensor(hass, "Volcano Heat", HEAT_ON_UUID, HEAT_OFF_UUID)
+    settings_sensors = [
+        VolcanoSettingsSensor(hass, sensor["name"], sensor["uuid"], sensor["decode"])
+        for sensor in SETTINGS_SENSORS
+    ]
+    hass.data[DOMAIN]["settings_sensors"] = settings_sensors
 
-    async_add_entities([temperature_sensor, fan_sensor, heat_sensor])
+    async_add_entities([temperature_sensor] + settings_sensors)
