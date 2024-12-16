@@ -1,4 +1,5 @@
 from homeassistant.components.button import ButtonEntity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
@@ -40,12 +41,6 @@ class ConnectBluetoothButton(ButtonEntity):
             status_sensor = self._hass.data[DOMAIN].get("status_sensor")
             if status_sensor:
                 status_sensor.set_running(True)
-
-            # Start fetching temperature
-            temperature_sensor = self._hass.data[DOMAIN].get("temperature_sensor")
-            if temperature_sensor:
-                _LOGGER.info("Starting temperature updates.")
-                # No action needed; temperature sensor updates automatically
 
         except Exception as e:
             _LOGGER.error("Failed to connect to Bluetooth device: %s", e)
@@ -96,24 +91,10 @@ class GetSettingsButton(ButtonEntity):
         """Handle button press to fetch settings."""
         _LOGGER.info("Fetching settings values...")
         await fetch_settings(self._hass)
+        _LOGGER.info("Settings values fetched successfully.")
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    """Set up the buttons."""
-    # Create the status sensor and store it
-    status_sensor = VolcanoStatusSensor(hass)
-    hass.data[DOMAIN]["status_sensor"] = status_sensor
-
-    # Add buttons and status sensor
-    async_add_entities([
-        ConnectBluetoothButton(hass),
-        DisconnectBluetoothButton(hass),
-        GetSettingsButton(hass),
-        status_sensor
-    ])
-
-
-class VolcanoStatusSensor(ButtonEntity):
+class VolcanoStatusSensor(SensorEntity):
     """Sensor to represent the Bluetooth connection status."""
 
     def __init__(self, hass: HomeAssistant):
@@ -131,8 +112,23 @@ class VolcanoStatusSensor(ButtonEntity):
         """Return the current connection status."""
         return self._state
 
+    async def async_added_to_hass(self):
+        """Ensure the sensor is registered with Home Assistant."""
+        self._hass.data[DOMAIN]["status_sensor"] = self
+
     def set_running(self, running: bool):
         """Update the status based on the connection."""
         self._state = "Connected" if running else "Disconnected"
         self.async_write_ha_state()
         _LOGGER.info("Bluetooth status updated: %s", self._state)
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+    """Set up the buttons."""
+    # Add buttons and status sensor
+    async_add_entities([
+        ConnectBluetoothButton(hass),
+        DisconnectBluetoothButton(hass),
+        GetSettingsButton(hass),
+        VolcanoStatusSensor(hass)
+    ])
