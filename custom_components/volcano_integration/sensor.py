@@ -51,8 +51,12 @@ class VolcanoBluetoothSensor(SensorEntity):
         return self._state
 
     async def async_added_to_hass(self):
-        """Called when the entity is added to Home Assistant."""
-        if self._update_interval:
+        """Ensure entity is fully initialized before fetching data."""
+        if self._update_interval is None:
+            # Fetch on-connect data only after the entity is fully initialized
+            await self.fetch_data()
+        elif self._update_interval:
+            # Start periodic updates after the entity is fully initialized
             self._hass.loop.create_task(self._periodic_update())
 
     async def fetch_data(self):
@@ -60,13 +64,16 @@ class VolcanoBluetoothSensor(SensorEntity):
         try:
             value = await self._client.read_gatt_char(self._uuid)
             if not value:
-                _LOGGER.error("Unrecognized or empty value for %s (UUID: %s)", self._name, self._uuid)
+                _LOGGER.error("Empty or unrecognized value for %s (UUID: %s)", self._name, self._uuid)
                 return
             self._state = self._decode(value)
             self.async_write_ha_state()
             _LOGGER.debug("Updated %s: %s", self._name, self._state)
         except Exception as e:
-            _LOGGER.error("Error fetching data for %s (UUID: %s): %s", self._name, self._uuid, e)
+            if "Characteristic" in str(e) and "not found" in str(e):
+                _LOGGER.error("Characteristic %s not found for %s. Skipping...", self._uuid, self._name)
+            else:
+                _LOGGER.error("Error fetching data for %s (UUID: %s): %s", self._name, self._uuid, e)
 
     async def _periodic_update(self):
         """Update the sensor periodically."""
@@ -126,7 +133,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     for sensor in SENSORS:
         if sensor["update_interval"] is None:
             entity = VolcanoBluetoothSensor(hass, sensor["name"], sensor["uuid"], client, sensor["decode"])
-            await entity.fetch_data()  # Fetch data immediately
             entities.append(entity)
 
     # Periodic sensors
