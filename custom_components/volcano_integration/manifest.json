@@ -1,7 +1,7 @@
 {
   "domain": "volcano_integration",
   "name": "Volcano Integration",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "documentation": "https://github.com/Chuffnugget/volcano_integration",
   "requirements": [],
   "dependencies": [],
