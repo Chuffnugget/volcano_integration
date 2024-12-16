@@ -56,13 +56,17 @@ class VolcanoBluetoothSensor(SensorEntity):
     async def fetch_data(self, client: BleakClient):
         """Fetch data from the Bluetooth device."""
         try:
-            value = await client.read_gatt_char(self._uuid)
-            if not value:
-                _LOGGER.error("Empty or unrecognized value for %s (UUID: %s)", self._name, self._uuid)
-                return
-            self._state = self._decode(value)
-            self.async_write_ha_state()
-            _LOGGER.debug("Updated %s: %s", self._name, self._state)
+            queue = self._hass.data[DOMAIN]["bluetooth_queue"]
+            await queue.put(self._uuid)
+
+            async with queue:
+                value = await client.read_gatt_char(self._uuid)
+                if not value:
+                    _LOGGER.error("Empty or unrecognized value for %s (UUID: %s)", self._name, self._uuid)
+                    return
+                self._state = self._decode(value)
+                self.async_write_ha_state()
+                _LOGGER.debug("Updated %s: %s", self._name, self._state)
         except Exception as e:
             if "Characteristic" in str(e) and "not found" in str(e):
                 _LOGGER.error("Characteristic %s not found for %s. Skipping...", self._uuid, self._name)
@@ -116,8 +120,8 @@ class VolcanoStatusSensor(SensorEntity):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up all sensors."""
-    # Do not connect on setup
     hass.data[DOMAIN]["bluetooth_client"] = None
+    hass.data[DOMAIN]["bluetooth_queue"] = asyncio.Queue()
 
     entities = [
         VolcanoTemperatureSensor(hass, "Volcano Current Temperature", "10110001-5354-4f52-5a26-4249434b454c", decode=lambda v: int.from_bytes(v, byteorder="little") / 10.0),
