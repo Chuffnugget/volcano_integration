@@ -4,8 +4,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 
-class StartRandomNumberButton(ButtonEntity):
-    """Button to start the random number generator."""
+class ConnectBluetoothButton(ButtonEntity):
+    """Button to connect to the Bluetooth device."""
 
     def __init__(self, hass):
         """Initialize the button."""
@@ -14,22 +14,17 @@ class StartRandomNumberButton(ButtonEntity):
     @property
     def name(self):
         """Return the name of the button."""
-        return "Start Random Number Generator"
+        return "Connect Bluetooth"
 
     async def async_press(self):
-        """Handle button press to start the generator."""
+        """Handle button press to connect."""
         sensor = self._hass.data[DOMAIN].get("sensor")
         if sensor:
-            sensor._running = True
-            self._hass.loop.create_task(sensor._generate_random_number())
-            # Update status sensor
-            status_sensor = self._hass.data[DOMAIN].get("status_sensor")
-            if status_sensor:
-                status_sensor.set_running(True)
+            await sensor.connect()
 
 
-class StopRandomNumberButton(ButtonEntity):
-    """Button to stop the random number generator."""
+class DisconnectBluetoothButton(ButtonEntity):
+    """Button to disconnect from the Bluetooth device."""
 
     def __init__(self, hass):
         """Initialize the button."""
@@ -38,19 +33,15 @@ class StopRandomNumberButton(ButtonEntity):
     @property
     def name(self):
         """Return the name of the button."""
-        return "Stop Random Number Generator"
+        return "Disconnect Bluetooth"
 
     async def async_press(self):
-        """Handle button press to stop the generator."""
+        """Handle button press to disconnect."""
         sensor = self._hass.data[DOMAIN].get("sensor")
         if sensor:
-            sensor.stop()
-            # Update status sensor
-            status_sensor = self._hass.data[DOMAIN].get("status_sensor")
-            if status_sensor:
-                status_sensor.set_running(False)
+            await sensor.disconnect()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up the buttons."""
-    async_add_entities([StartRandomNumberButton(hass), StopRandomNumberButton(hass)])
+    async_add_entities([ConnectBluetoothButton(hass), DisconnectBluetoothButton(hass)])
