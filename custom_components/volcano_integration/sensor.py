@@ -24,10 +24,9 @@ _LOGGER = logging.getLogger(__name__)
 class VolcanoTemperatureSensor(SensorEntity):
     """Sensor for current temperature."""
 
-    def __init__(self, hass: HomeAssistant, client: BleakClient):
+    def __init__(self, hass: HomeAssistant):
         """Initialize the temperature sensor."""
         self._hass = hass
-        self._client = client
         self._state = None
 
     @property
@@ -55,9 +54,10 @@ class VolcanoTemperatureSensor(SensorEntity):
     async def _periodic_update(self):
         """Periodically update the temperature."""
         while True:
-            if self._client and self._client.is_connected:
+            client = self._hass.data[DOMAIN].get("bluetooth_client")
+            if client and client.is_connected:
                 try:
-                    value = await self._client.read_gatt_char(TEMPERATURE_UUID)
+                    value = await client.read_gatt_char(TEMPERATURE_UUID)
                     self._state = int.from_bytes(value, byteorder="little") / 10.0
                     self.async_write_ha_state()
                     _LOGGER.debug("Updated Current Temperature: %.1f °C", self._state)
@@ -69,10 +69,9 @@ class VolcanoTemperatureSensor(SensorEntity):
 class VolcanoSettingsSensor(SensorEntity):
     """Sensor for on-demand settings."""
 
-    def __init__(self, hass: HomeAssistant, client: BleakClient, name: str, uuid: str, decode):
+    def __init__(self, hass: HomeAssistant, name: str, uuid: str, decode):
         """Initialize the settings sensor."""
         self._hass = hass
-        self._client = client
         self._name = name
         self._uuid = uuid
         self._decode = decode
@@ -90,9 +89,10 @@ class VolcanoSettingsSensor(SensorEntity):
 
     async def fetch_setting(self):
         """Fetch the sensor value."""
-        if self._client and self._client.is_connected:
+        client = self._hass.data[DOMAIN].get("bluetooth_client")
+        if client and client.is_connected:
             try:
-                value = await self._client.read_gatt_char(self._uuid)
+                value = await client.read_gatt_char(self._uuid)
                 self._state = self._decode(value)
                 self.async_write_ha_state()
                 _LOGGER.info("Updated %s: %s", self._name, self._state)
@@ -102,21 +102,21 @@ class VolcanoSettingsSensor(SensorEntity):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up sensors for the integration."""
-    client = hass.data[DOMAIN].get("bluetooth_client")
+    # Initialize Bluetooth client as None; connection happens on button press
+    hass.data[DOMAIN]["bluetooth_client"] = None
 
     # Create the temperature sensor
-    temperature_sensor = VolcanoTemperatureSensor(hass, client)
+    temperature_sensor = VolcanoTemperatureSensor(hass)
+    hass.data[DOMAIN]["temperature_sensor"] = temperature_sensor
 
     # Create the settings sensors
     settings_sensors = [
-        VolcanoSettingsSensor(hass, client, sensor["name"], sensor["uuid"], sensor["decode"])
+        VolcanoSettingsSensor(hass, sensor["name"], sensor["uuid"], sensor["decode"])
         for sensor in SETTINGS_SENSORS
     ]
+    hass.data[DOMAIN]["settings_sensors"] = settings_sensors
 
     async_add_entities([temperature_sensor] + settings_sensors)
-
-    # Store the sensors for on-demand updates
-    hass.data[DOMAIN]["settings_sensors"] = settings_sensors
 
 
 async def fetch_settings(hass: HomeAssistant):
