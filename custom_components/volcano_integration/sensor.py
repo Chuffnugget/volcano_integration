@@ -77,10 +77,10 @@ class VolcanoTemperatureSensor(SensorEntity):
         while self._connected:
             try:
                 value = await self._client.read_gatt_char(TEMPERATURE_CHARACTERISTIC)
-                # Assume the temperature is an integer in °C
-                self._state = int.from_bytes(value, byteorder="little")
+                # Assume the temperature is in tenths of °C; divide by 10
+                self._state = int.from_bytes(value, byteorder="little") / 10.0
                 self.async_write_ha_state()
-                _LOGGER.debug("Temperature updated: %s °C", self._state)
+                _LOGGER.debug("Temperature updated: %.1f °C", self._state)
             except Exception as e:
                 self._connected = False
                 self._hass.data[DOMAIN]["status_sensor"].set_running(False)
