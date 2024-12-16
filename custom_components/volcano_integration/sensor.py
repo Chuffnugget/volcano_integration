@@ -14,7 +14,6 @@ SENSORS = [
     {"name": "BLE Firmware Version", "uuid": "10100004-5354-4f52-5a26-4249434b454c", "update_interval": None, "decode": lambda v: v.decode("utf-8").strip()},
     {"name": "Serial Number", "uuid": "10100008-5354-4f52-5a26-4249434b454c", "update_interval": None, "decode": lambda v: v.decode("utf-8").strip()},
     {"name": "Firmware Version", "uuid": "10100003-5354-4f52-5a26-4249434b454c", "update_interval": None, "decode": lambda v: v.decode("utf-8").strip()},
-    {"name": "BLE Device UUID", "uuid": "00000000-0000-0000-0000-000000000420", "update_interval": None, "decode": lambda v: v.decode("utf-8").strip()},
     {"name": "Auto Shutoff Status", "uuid": "1011000c-5354-4f52-5a26-4249434b454c", "update_interval": None, "decode": lambda v: "Enabled" if v == bytearray([0x01]) else "Disabled"},
     {"name": "Auto Shutoff Setting", "uuid": "1011000d-5354-4f52-5a26-4249434b454c", "update_interval": None, "decode": lambda v: f"{int.from_bytes(v, byteorder='little') // 60} minutes"},
 
@@ -30,12 +29,11 @@ _LOGGER = logging.getLogger(__name__)
 class VolcanoBluetoothSensor(SensorEntity):
     """Generic sensor for reading Bluetooth characteristics."""
 
-    def __init__(self, hass: HomeAssistant, name: str, uuid: str, client: BleakClient, decode, update_interval: int = None):
+    def __init__(self, hass: HomeAssistant, name: str, uuid: str, decode, update_interval: int = None):
         """Initialize the sensor."""
         self._hass = hass
         self._name = name
         self._uuid = uuid
-        self._client = client
         self._decode = decode
         self._update_interval = update_interval
         self._state = None
@@ -52,17 +50,13 @@ class VolcanoBluetoothSensor(SensorEntity):
 
     async def async_added_to_hass(self):
         """Ensure entity is fully initialized before fetching data."""
-        if self._update_interval is None:
-            # Fetch on-connect data only after the entity is fully initialized
-            await self.fetch_data()
-        elif self._update_interval:
-            # Start periodic updates after the entity is fully initialized
+        if self._update_interval:
             self._hass.loop.create_task(self._periodic_update())
 
-    async def fetch_data(self):
+    async def fetch_data(self, client: BleakClient):
         """Fetch data from the Bluetooth device."""
         try:
-            value = await self._client.read_gatt_char(self._uuid)
+            value = await client.read_gatt_char(self._uuid)
             if not value:
                 _LOGGER.error("Empty or unrecognized value for %s (UUID: %s)", self._name, self._uuid)
                 return
@@ -78,7 +72,9 @@ class VolcanoBluetoothSensor(SensorEntity):
     async def _periodic_update(self):
         """Update the sensor periodically."""
         while True:
-            await self.fetch_data()
+            client = self._hass.data[DOMAIN].get("bluetooth_client")
+            if client and client.is_connected:
+                await self.fetch_data(client)
             await asyncio.sleep(self._update_interval)
 
 
@@ -120,30 +116,26 @@ class VolcanoStatusSensor(SensorEntity):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up all sensors."""
-    client = BleakClient(ADDRESS)
-    await client.connect()
-    _LOGGER.info("Connected to Bluetooth device at %s", ADDRESS)
+    # Do not connect on setup
+    hass.data[DOMAIN]["bluetooth_client"] = None
 
     entities = [
-        VolcanoTemperatureSensor(hass, "Volcano Current Temperature", "10110001-5354-4f52-5a26-4249434b454c", client, decode=lambda v: int.from_bytes(v, byteorder="little") / 10.0),
+        VolcanoTemperatureSensor(hass, "Volcano Current Temperature", "10110001-5354-4f52-5a26-4249434b454c", decode=lambda v: int.from_bytes(v, byteorder="little") / 10.0),
         VolcanoStatusSensor(hass)
     ]
 
     # On-connect only sensors
     for sensor in SENSORS:
         if sensor["update_interval"] is None:
-            entity = VolcanoBluetoothSensor(hass, sensor["name"], sensor["uuid"], client, sensor["decode"])
+            entity = VolcanoBluetoothSensor(hass, sensor["name"], sensor["uuid"], sensor["decode"])
             entities.append(entity)
 
     # Periodic sensors
     for sensor in SENSORS:
         if sensor["update_interval"] is not None:
-            entities.append(VolcanoBluetoothSensor(hass, sensor["name"], sensor["uuid"], client, sensor["decode"], sensor["update_interval"]))
+            entities.append(VolcanoBluetoothSensor(hass, sensor["name"], sensor["uuid"], sensor["decode"], sensor["update_interval"]))
 
     async_add_entities(entities)
-
-    # Ensure client disconnects on unload
-    hass.data[DOMAIN]["bluetooth_client"] = client
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
