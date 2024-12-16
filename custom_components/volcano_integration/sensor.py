@@ -2,86 +2,106 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-import random
+from bleak import BleakClient
 import asyncio
 from .const import DOMAIN
 
-class RandomNumberSensor(SensorEntity):
-    """Sensor to generate random numbers."""
+ADDRESS = "CE:9E:A6:43:25:F3"  # Static address of the Bluetooth device
+TEMPERATURE_CHARACTERISTIC = "10110001-5354-4f52-5a26-4249434b454c"  # GATT characteristic
+
+class TemperatureSensor(SensorEntity):
+    """Sensor to read temperature from a Bluetooth device."""
 
     def __init__(self, hass: HomeAssistant):
-        """Initialize the random number sensor."""
+        """Initialize the temperature sensor."""
         self._hass = hass
         self._state = None
-        self._running = True
+        self._connected = False
+        self._client = None
 
     @property
     def name(self):
         """Return the name of the sensor."""
-        return "Random Number"
+        return "Bluetooth Temperature"
 
     @property
     def state(self):
-        """Return the current random number."""
+        """Return the current temperature."""
         return self._state
 
     async def async_added_to_hass(self):
-        """Start generating random numbers when added to Home Assistant."""
+        """Called when the entity is added to Home Assistant."""
         self._hass.data[DOMAIN]["sensor"] = self
-        self._running = True
-        self._hass.loop.create_task(self._generate_random_number())
 
-    async def _generate_random_number(self):
-        """Generate random numbers every second."""
-        while self._running:
-            self._state = random.randint(1, 100)
-            self.async_write_ha_state()
-            # Update the status sensor
-            status_sensor = self._hass.data[DOMAIN].get("status_sensor")
-            if status_sensor:
-                status_sensor.set_running(True)
-            await asyncio.sleep(1)
+    async def connect(self):
+        """Connect to the Bluetooth device."""
+        if self._connected:
+            return
+        try:
+            self._client = BleakClient(ADDRESS)
+            await self._client.connect()
+            self._connected = True
+            self._hass.data[DOMAIN]["status_sensor"].set_running(True)
+            # Start reading temperature
+            self._hass.loop.create_task(self._read_temperature())
+        except Exception as e:
+            self._connected = False
+            self._hass.data[DOMAIN]["status_sensor"].set_running(False)
+            raise e
 
-    def stop(self):
-        """Stop the random number generator."""
-        self._running = False
-        # Update the status sensor
-        status_sensor = self._hass.data[DOMAIN].get("status_sensor")
-        if status_sensor:
-            status_sensor.set_running(False)
+    async def disconnect(self):
+        """Disconnect from the Bluetooth device."""
+        if self._connected and self._client:
+            await self._client.disconnect()
+        self._connected = False
+        self._hass.data[DOMAIN]["status_sensor"].set_running(False)
+
+    async def _read_temperature(self):
+        """Read the temperature every 0.4 seconds."""
+        while self._connected:
+            try:
+                value = await self._client.read_gatt_char(TEMPERATURE_CHARACTERISTIC)
+                # Assume the temperature is sent as a float in little-endian
+                self._state = int.from_bytes(value, byteorder="little") / 100.0
+                self.async_write_ha_state()
+            except Exception as e:
+                self._connected = False
+                self._hass.data[DOMAIN]["status_sensor"].set_running(False)
+                raise e
+            await asyncio.sleep(0.4)
 
 
 class StatusSensor(SensorEntity):
-    """Sensor to represent the generator's running status."""
+    """Sensor to represent the Bluetooth connection status."""
 
     def __init__(self, hass: HomeAssistant):
         """Initialize the status sensor."""
         self._hass = hass
-        self._state = "Disconnected"  # Initial state
+        self._state = "Disconnected"
 
     @property
     def name(self):
         """Return the name of the status sensor."""
-        return "Generator Status"
+        return "Bluetooth Status"
 
     @property
     def state(self):
-        """Return the current status."""
+        """Return the current connection status."""
         return self._state
 
     def set_running(self, running: bool):
-        """Update the status based on whether the generator is running."""
+        """Update the status based on the connection."""
         self._state = "Connected" if running else "Disconnected"
         self.async_write_ha_state()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up the sensors."""
-    # Create the random number sensor
-    random_sensor = RandomNumberSensor(hass)
-
-    # Create the status sensor
+    temperature_sensor = TemperatureSensor(hass)
     status_sensor = StatusSensor(hass)
+
+    # Save the sensors for use by the buttons
+    hass.data[DOMAIN]["sensor"] = temperature_sensor
     hass.data[DOMAIN]["status_sensor"] = status_sensor
 
-    async_add_entities([random_sensor, status_sensor])
+    async_add_entities([temperature_sensor, status_sensor])
