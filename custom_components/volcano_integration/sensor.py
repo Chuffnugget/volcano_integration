@@ -4,13 +4,16 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from bleak import BleakClient
 import asyncio
+import logging
 from .const import DOMAIN
 
-ADDRESS = "CE:9E:A6:43:25:F3"  # Static address of the Bluetooth device
-TEMPERATURE_CHARACTERISTIC = "10110001-5354-4f52-5a26-4249434b454c"  # GATT characteristic
+ADDRESS = "CE:9E:A6:43:25:F3"  # Bluetooth device address
+TEMPERATURE_CHARACTERISTIC = "10110001-5354-4f52-5a26-4249434b454c"  # GATT characteristic UUID
 
-class TemperatureSensor(SensorEntity):
-    """Sensor to read temperature from a Bluetooth device."""
+_LOGGER = logging.getLogger(__name__)
+
+class VolcanoTemperatureSensor(SensorEntity):
+    """Sensor to read the current temperature from a Bluetooth device."""
 
     def __init__(self, hass: HomeAssistant):
         """Initialize the temperature sensor."""
@@ -22,32 +25,44 @@ class TemperatureSensor(SensorEntity):
     @property
     def name(self):
         """Return the name of the sensor."""
-        return "Bluetooth Temperature"
+        return "Volcano Current Temperature"
 
     @property
     def state(self):
         """Return the current temperature."""
         return self._state
 
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return "°C"
+
+    @property
+    def device_class(self):
+        """Return the device class."""
+        return "temperature"
+
     async def async_added_to_hass(self):
         """Called when the entity is added to Home Assistant."""
         self._hass.data[DOMAIN]["sensor"] = self
+        _LOGGER.info("Temperature sensor added to Home Assistant.")
 
     async def connect(self):
         """Connect to the Bluetooth device."""
         if self._connected:
+            _LOGGER.warning("Already connected to the Bluetooth device.")
             return
         try:
             self._client = BleakClient(ADDRESS)
             await self._client.connect()
             self._connected = True
+            _LOGGER.info("Connected to Bluetooth device at %s", ADDRESS)
             self._hass.data[DOMAIN]["status_sensor"].set_running(True)
-            # Start reading temperature
             self._hass.loop.create_task(self._read_temperature())
         except Exception as e:
             self._connected = False
             self._hass.data[DOMAIN]["status_sensor"].set_running(False)
-            raise e
+            _LOGGER.error("Failed to connect to Bluetooth device: %s", e)
 
     async def disconnect(self):
         """Disconnect from the Bluetooth device."""
@@ -55,23 +70,25 @@ class TemperatureSensor(SensorEntity):
             await self._client.disconnect()
         self._connected = False
         self._hass.data[DOMAIN]["status_sensor"].set_running(False)
+        _LOGGER.info("Disconnected from Bluetooth device at %s", ADDRESS)
 
     async def _read_temperature(self):
         """Read the temperature every 0.4 seconds."""
         while self._connected:
             try:
                 value = await self._client.read_gatt_char(TEMPERATURE_CHARACTERISTIC)
-                # Assume the temperature is sent as a float in little-endian
-                self._state = int.from_bytes(value, byteorder="little") / 100.0
+                # Assume the temperature is an integer in °C
+                self._state = int.from_bytes(value, byteorder="little")
                 self.async_write_ha_state()
+                _LOGGER.debug("Temperature updated: %s °C", self._state)
             except Exception as e:
                 self._connected = False
                 self._hass.data[DOMAIN]["status_sensor"].set_running(False)
-                raise e
+                _LOGGER.error("Error reading temperature: %s", e)
             await asyncio.sleep(0.4)
 
 
-class StatusSensor(SensorEntity):
+class VolcanoStatusSensor(SensorEntity):
     """Sensor to represent the Bluetooth connection status."""
 
     def __init__(self, hass: HomeAssistant):
@@ -82,7 +99,7 @@ class StatusSensor(SensorEntity):
     @property
     def name(self):
         """Return the name of the status sensor."""
-        return "Bluetooth Status"
+        return "Volcano Bluetooth Status"
 
     @property
     def state(self):
@@ -93,14 +110,14 @@ class StatusSensor(SensorEntity):
         """Update the status based on the connection."""
         self._state = "Connected" if running else "Disconnected"
         self.async_write_ha_state()
+        _LOGGER.info("Bluetooth status updated: %s", self._state)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Set up the sensors."""
-    temperature_sensor = TemperatureSensor(hass)
-    status_sensor = StatusSensor(hass)
+    temperature_sensor = VolcanoTemperatureSensor(hass)
+    status_sensor = VolcanoStatusSensor(hass)
 
-    # Save the sensors for use by the buttons
     hass.data[DOMAIN]["sensor"] = temperature_sensor
     hass.data[DOMAIN]["status_sensor"] = status_sensor
 
