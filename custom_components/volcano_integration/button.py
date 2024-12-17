@@ -4,10 +4,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
 from bleak import BleakClient
 from .bluetooth_queue import BluetoothQueue
-from .settings_handler import fetch_settings  # Import moved here
+from .settings_handler import fetch_settings
 from .const import DOMAIN
+import logging  # Ensure logging is imported
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)  # Logging initialization
 
 ADDRESS = "CE:9E:A6:43:25:F3"
 
