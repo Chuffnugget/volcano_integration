@@ -4,14 +4,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
 from bleak import BleakClient
 from .bluetooth_queue import BluetoothQueue
-from .sensor import fetch_settings
+from .settings_handler import fetch_settings  # Import moved here
 from .const import DOMAIN
 
-import logging
-
-ADDRESS = "CE:9E:A6:43:25:F3"
 _LOGGER = logging.getLogger(__name__)
 
+ADDRESS = "CE:9E:A6:43:25:F3"
 
 class ConnectBluetoothButton(ButtonEntity):
     """Button to connect to the Bluetooth device."""
