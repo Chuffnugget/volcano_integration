@@ -3,7 +3,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
 from bleak import BleakClient
-from .sensor import fetch_settings
+from .sensor import fetch_settings, BluetoothQueue  # Import BluetoothQueue from sensor.py
 from .const import DOMAIN
 
 import logging
@@ -32,12 +32,13 @@ class ConnectBluetoothButton(ButtonEntity):
             return
 
         try:
+            # Initialize the Bluetooth client
             client = BleakClient(ADDRESS)
             await client.connect()
             self._hass.data[DOMAIN]["bluetooth_client"] = client
             _LOGGER.info("Connected to Bluetooth device at %s", ADDRESS)
 
-            # Start Bluetooth queue
+            # Initialize and start the Bluetooth queue
             queue = BluetoothQueue(client)
             self._hass.data[DOMAIN]["bluetooth_queue"] = queue
             await queue.start()
@@ -66,6 +67,9 @@ class DisconnectBluetoothButton(ButtonEntity):
             await client.disconnect()
             _LOGGER.info("Disconnected from Bluetooth device at %s", ADDRESS)
             self._hass.data[DOMAIN]["bluetooth_client"] = None
+
+            # Clear the Bluetooth queue
+            self._hass.data[DOMAIN]["bluetooth_queue"] = None
         else:
             _LOGGER.warning("Bluetooth is already disconnected.")
 
