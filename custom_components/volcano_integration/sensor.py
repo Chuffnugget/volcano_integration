@@ -54,10 +54,4 @@ class PeriodicBluetoothSensor(SensorEntity):
             await asyncio.sleep(self._interval)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    sensors = [
-        PeriodicBluetoothSensor(hass, "Volcano Current Temperature", TEMPERATURE_UUID, lambda v: int.from_bytes(v, byteorder="little") / 10, 0.5),
-    ]
-
-    async_add_entities(sensors)
-    _LOGGER.info("Volcano sensors set up.")
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: 
