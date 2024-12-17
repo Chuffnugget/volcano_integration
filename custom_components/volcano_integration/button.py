@@ -10,7 +10,6 @@ from .const import DOMAIN
 import logging
 
 ADDRESS = "CE:9E:A6:43:25:F3"
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -25,23 +24,23 @@ class ConnectBluetoothButton(ButtonEntity):
         return "Connect Bluetooth"
 
     async def async_press(self):
-        if self._hass.data[DOMAIN].get("bluetooth_client") is not None:
-            _LOGGER.warning("Bluetooth is already connected.")
-            return
+        """Handle button press to connect."""
+        client = self._hass.data[DOMAIN].get("bluetooth_client")
+        queue = self._hass.data[DOMAIN].get("bluetooth_queue")
 
-        try:
+        if client is None:
             client = BleakClient(ADDRESS)
-            await client.connect()
             self._hass.data[DOMAIN]["bluetooth_client"] = client
 
+        if queue is None:
             queue = BluetoothQueue(client)
             self._hass.data[DOMAIN]["bluetooth_queue"] = queue
             await queue.start()
 
-            _LOGGER.info("Connected to Bluetooth device at %s", ADDRESS)
+        try:
+            await queue.connect()
         except Exception as e:
-            _LOGGER.error("Failed to connect to Bluetooth device: %s", e)
-            self._hass.data[DOMAIN]["bluetooth_client"] = None
+            _LOGGER.error("Failed to connect to Bluetooth: %s", e)
 
 
 class DisconnectBluetoothButton(ButtonEntity):
@@ -55,14 +54,16 @@ class DisconnectBluetoothButton(ButtonEntity):
         return "Disconnect Bluetooth"
 
     async def async_press(self):
-        client = self._hass.data[DOMAIN].get("bluetooth_client")
-        if client and client.is_connected:
-            await client.disconnect()
-            self._hass.data[DOMAIN]["bluetooth_client"] = None
-            self._hass.data[DOMAIN]["bluetooth_queue"] = None
-            _LOGGER.info("Disconnected from Bluetooth device.")
-        else:
-            _LOGGER.warning("Bluetooth is already disconnected.")
+        """Handle button press to disconnect."""
+        queue = self._hass.data[DOMAIN].get("bluetooth_queue")
+        if queue is None:
+            _LOGGER.warning("BluetoothQueue is not initialized.")
+            return
+
+        try:
+            await queue.disconnect()
+        except Exception as e:
+            _LOGGER.error("Failed to disconnect from Bluetooth: %s", e)
 
 
 class GetSettingsButton(ButtonEntity):
@@ -76,6 +77,7 @@ class GetSettingsButton(ButtonEntity):
         return "Get Settings"
 
     async def async_press(self):
+        """Handle button press to fetch settings."""
         _LOGGER.info("Fetching settings values...")
         await fetch_settings(self._hass)
 
