@@ -33,5 +33,5 @@ class BluetoothQueue:
                 self.queue.task_done()
 
     async def start(self):
-        """Start the queue processing task."""
+        """Start processing the queue."""
         asyncio.create_task(self._process_queue())
