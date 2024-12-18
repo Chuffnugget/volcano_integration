@@ -17,7 +17,7 @@ from homeassistant.const import CONF_ADDRESS
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN
-from .device import GenericBTDevice
+from .device import VolcanoBTDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class VolcanoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data_schema=self._user_schema(),
                     errors=errors,
                 )
-            device = GenericBTDevice(discovery_info.device)
+            device = VolcanoBTDevice(discovery_info.device)
             try:
                 await device.connect()
                 await device.disconnect()
