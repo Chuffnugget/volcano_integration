@@ -7,14 +7,14 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import GenericBTCoordinator
+from .coordinator import VolcanoCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Volcano Integration buttons based on a config entry."""
-    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: VolcanoCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     buttons = [
         VolcanoHeatOnButton(coordinator),
@@ -28,7 +28,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class VolcanoHeatOnButton(CoordinatorEntity, ButtonEntity):
     """Representation of a Volcano Heat On Button."""
 
-    def __init__(self, coordinator: GenericBTCoordinator):
+    def __init__(self, coordinator: VolcanoCoordinator):
         """Initialize the button."""
         super().__init__(coordinator)
         self._attr_name = "Volcano Heat On"
@@ -47,7 +47,7 @@ class VolcanoHeatOnButton(CoordinatorEntity, ButtonEntity):
 class VolcanoHeatOffButton(CoordinatorEntity, ButtonEntity):
     """Representation of a Volcano Heat Off Button."""
 
-    def __init__(self, coordinator: GenericBTCoordinator):
+    def __init__(self, coordinator: VolcanoCoordinator):
         """Initialize the button."""
         super().__init__(coordinator)
         self._attr_name = "Volcano Heat Off"
