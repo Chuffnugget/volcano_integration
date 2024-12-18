@@ -5,7 +5,7 @@
   "documentation": "https://github.com/Chuffnugget/volcano_integration",
   "issue_tracker": "https://github.com/Chuffnugget/volcano_integration/issues",
   "requirements": [
-    "bleak==0.22.0"  // Bluetooth
+    "bleak==0.22.0"
   ],
   "dependencies": ["bluetooth_adapters"],
   "config_flow": true,
