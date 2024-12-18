@@ -2,6 +2,7 @@
 """Volcano Integration Bluetooth Device."""
 
 from bleak import BleakClient
+from bleak.exc import BleakError
 import asyncio
 import logging
 
@@ -49,3 +50,13 @@ class GenericBTDevice:
     def is_connected(self):
         """Check if the device is connected."""
         return self._client.is_connected
+
+    async def update(self):
+        """Custom method to update device status or data."""
+        # Implement your device-specific update logic here
+        pass
+
+    async def stop(self):
+        """Custom method to perform any cleanup before stopping."""
+        # Implement your device-specific stop logic here
+        await self.disconnect()
