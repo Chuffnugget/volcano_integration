@@ -13,12 +13,24 @@ from .device import GenericBTDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Volcano Integration from a config entry."""
     ble_address = entry.data.get("address")
-    ble_device = await hass.components.bluetooth.async_ble_device_from_address(
-        ble_address, connectable=True
-    )
+    if not ble_address:
+        _LOGGER.error("No Bluetooth address found in config entry.")
+        return False
+
+    # Import the async_ble_device_from_address function directly
+    from homeassistant.components.bluetooth import async_ble_device_from_address
+
+    try:
+        ble_device = await async_ble_device_from_address(
+            hass, ble_address, connectable=True
+        )
+    except Exception as e:
+        _LOGGER.error("Error obtaining BLE device: %s", e)
+        return False
 
     if not ble_device:
         _LOGGER.error("Bluetooth device not found: %s", ble_address)
@@ -42,11 +54,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     # Set up platforms (sensors, binary sensors, buttons)
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, ("sensor", "binary_sensor", "button"))
-    )
+    for component in ("sensor", "binary_sensor", "button"):
+        hass.async_create_task(
+            hass.config_entries.async_forward_entry_setup(entry, component)
+        )
 
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
@@ -54,14 +68,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_disconnect()
 
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, platform)
-                for platform in ("sensor", "binary_sensor", "button")
-            ]
-        )
-    )
+    unload_ok = True
+    for component in ("sensor", "binary_sensor", "button"):
+        unload_ok &= await hass.config_entries.async_forward_entry_unload(entry, component)
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
