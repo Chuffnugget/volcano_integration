@@ -10,8 +10,8 @@ from bleak.exc import BleakError
 _LOGGER = logging.getLogger(__name__)
 
 
-class GenericBTDevice:
-    """Generic Bluetooth Device for Volcano Integration."""
+class VolcanoBTDevice:
+    """Volcano Bluetooth Device for Volcano Integration."""
 
     def __init__(self, ble_device):
         """Initialize the Bluetooth device."""
