@@ -8,9 +8,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .device import GenericBTDevice
-from .const import DEVICE_STARTUP_TIMEOUT_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
+
+DEVICE_STARTUP_TIMEOUT_SECONDS = 30  # Adjust as needed
 
 class GenericBTCoordinator(DataUpdateCoordinator):
     """DataUpdateCoordinator for Generic Bluetooth devices."""
@@ -44,7 +45,15 @@ class GenericBTCoordinator(DataUpdateCoordinator):
     async def async_update_data(self):
         """Fetch data from the device."""
         # Implement your data fetching logic here
-        pass
+        # Example: Read temperature from a specific UUID
+        try:
+            temperature_uuid = "00002a6e-0000-1000-8000-00805f9b34fb"  # Replace with actual UUID
+            raw_data = await self.bt_device.read_gatt_char(temperature_uuid)
+            temperature = int.from_bytes(raw_data, byteorder='little') / 100  # Example conversion
+            return temperature
+        except Exception as e:
+            _LOGGER.error("Error fetching data from device: %s", e)
+            raise
 
     async def wait_ready(self) -> bool:
         """Wait until the device is ready."""
