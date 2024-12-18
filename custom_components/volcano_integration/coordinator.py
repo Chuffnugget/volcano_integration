@@ -7,13 +7,13 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .device import GenericBTDevice
+from .device import VolcanoBTDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class GenericBTCoordinator(DataUpdateCoordinator):
-    """DataUpdateCoordinator for Generic Bluetooth devices."""
+class VolcanoCoordinator(DataUpdateCoordinator):
+    """DataUpdateCoordinator for Volcano Bluetooth devices."""
 
     def __init__(self, hass: HomeAssistant, ble_device, device, device_name, base_unique_id):
         """Initialize the coordinator."""
@@ -29,7 +29,7 @@ class GenericBTCoordinator(DataUpdateCoordinator):
         self.base_unique_id = base_unique_id
         self._ready_event = asyncio.Event()
         self._was_unavailable = True
-        self.bt_device = GenericBTDevice(ble_device)
+        self.bt_device = VolcanoBTDevice(ble_device)
 
     async def async_connect(self):
         """Connect to the Bluetooth device."""
@@ -47,12 +47,22 @@ class GenericBTCoordinator(DataUpdateCoordinator):
         # For example, read temperature from a GATT characteristic
         temperature_uuid = "YOUR_TEMPERATURE_UUID"
         try:
-            data = await self.bt_device.read_gatt_char(temperature_uuid)
-            # Process the data as needed
-            return {"temperature": data}
+            raw_data = await self.bt_device.read_gatt_char(temperature_uuid)
+            # Process raw_data to extract temperature
+            temperature = self.process_temperature_data(raw_data)
+            return {"temperature": temperature}
         except Exception as e:
             _LOGGER.error("Error fetching data from device: %s", e)
             return {}
+
+    def process_temperature_data(self, raw_data: bytes) -> float:
+        """Process raw temperature data from the device."""
+        # Implement the actual processing based on your device's data format
+        # Example: Convert bytes to float
+        if len(raw_data) >= 2:
+            temperature = int.from_bytes(raw_data[:2], byteorder='little') / 100
+            return temperature
+        return 0.0
 
     async def wait_ready(self) -> bool:
         """Wait until the device is ready."""
