@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 import logging
-import asyncio
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, UUID_TEMPERATURE
+from .const import DOMAIN, UUID_HEAT_ON, UUID_HEAT_OFF
 from .coordinator import GenericBTCoordinator
 from .entity import GenericBTEntity
 
@@ -18,38 +17,51 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up Sensors for Volcano Integration based on a config entry."""
     coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([CurrentTemperatureSensor(coordinator)])
+    async_add_entities([
+        CurrentTemperatureSensor(coordinator),
+        HeatStatusSensor(coordinator)
+    ])
 
-class CurrentTemperatureSensor(GenericBTEntity, SensorEntity):
-    """Representation of the Current Temperature."""
+class HeatStatusSensor(GenericBTEntity, SensorEntity):
+    """Representation of the Heat Status."""
 
-    _attr_name = "Current Temperature"
-    _attr_unit_of_measurement = "°C"
-    _attr_icon = "mdi:thermometer"
+    _attr_name = "Heat Status"
+    _attr_icon = "mdi:fire"
+    _attr_state_class = None
+    _attr_unit_of_measurement = None
 
     def __init__(self, coordinator: GenericBTCoordinator) -> None:
-        """Initialize the temperature sensor."""
+        """Initialize the heat status sensor."""
         super().__init__(coordinator)
-        self._temperature = None
-        self._update_task = asyncio.create_task(self._update_temperature())
+        self._status = "Unknown"
+        self._update_task = asyncio.create_task(self._update_status())
 
     @property
     def state(self):
         """Return the state of the sensor."""
-        return self._temperature
+        return self._status
 
-    async def _update_temperature(self):
-        """Fetch temperature every second."""
+    async def _update_status(self):
+        """Fetch heat status periodically."""
         while True:
             try:
-                data = await self._device.read_gatt(UUID_TEMPERATURE)
-                if data:
-                    # Assuming temperature is a 2-byte little-endian integer
-                    self._temperature = int.from_bytes(data[:2], byteorder='little') / 100  # Adjust as per device specs
-                    self.async_write_ha_state()
+                # Read Heat On UUID
+                on_data = await self._device.read_gatt(UUID_HEAT_ON)
+                # Read Heat Off UUID
+                off_data = await self._device.read_gatt(UUID_HEAT_OFF)
+
+                # Determine heat status based on UUIDs
+                if on_data and any(b != 0 for b in on_data):
+                    self._status = "On"
+                elif off_data and any(b != 0 for b in off_data):
+                    self._status = "Off"
+                else:
+                    self._status = "Unknown"
+
+                self.async_write_ha_state()
             except Exception as e:
-                _LOGGER.error("Error reading temperature: %s", e)
-            await asyncio.sleep(1)  # Update every second
+                _LOGGER.error("Error reading heat status: %s", e)
+            await asyncio.sleep(5)  # Adjust polling interval as needed
 
     async def async_will_remove_from_hass(self):
         """Cleanup when entity is removed."""
