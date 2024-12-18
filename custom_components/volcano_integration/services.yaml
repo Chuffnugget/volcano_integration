@@ -1,34 +1,14 @@
-write_gatt:
-  name: Write Data into Target UUID
-  description: Write Data into Target UUID
-  target:
-    entity:
-      domain: binary_sensor
-      integration: volcano_integration
+# services.yaml
+heat_on:
+  description: "Turn on the volcano heat"
   fields:
-    target_uuid:
-      name: Target UUID
-      description: Target UUID
-      required: true
-      selector:
-        text:
-    data:
-      name: Data
-      description: Data
-      required: true
-      selector:
-        text:
-read_gatt:
-  name: Read Data from Target UUID
-  description: Read Data from Target UUID
-  target:
-    entity:
-      domain: binary_sensor
-      integration: volcano_integration
+    entity_id:
+      description: "The ID of the volcano entity"
+      example: "sensor.volcano_temperature"
+
+heat_off:
+  description: "Turn off the volcano heat"
   fields:
-    target_uuid:
-      name: Target UUID
-      description: Target UUID
-      required: true
-      selector:
-        text:
+    entity_id:
+      description: "The ID of the volcano entity"
+      example: "sensor.volcano_temperature"
