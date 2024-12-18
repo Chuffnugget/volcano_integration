@@ -1,72 +1,67 @@
-"""Volcano Integration for Home Assistant."""
+# __init__.py
+"""Initialize Volcano Integration."""
 
 import asyncio
 import logging
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from . import device, coordinator
+from .const import DOMAIN
+from .coordinator import GenericBTCoordinator
+from .device import GenericBTDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "volcano_integration"
-
-async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the Volcano Integration."""
-    _LOGGER.info("Setting up Volcano Integration")
-
-    # Initialization is handled via config entries
-    hass.data[DOMAIN] = {}
-
-    return True
-
-async def async_setup_entry(hass: HomeAssistant, entry):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Volcano Integration from a config entry."""
-    _LOGGER.info("Setting up Volcano Integration entry")
-
-    address: str = entry.data.get(coordinator.CONF_ADDRESS)
-    if not address:
-        _LOGGER.error("No Bluetooth address found in config entry")
-        return False
-
-    ble_device = await hass.components.bluetooth.async_ble_device_from_address(address.upper(), connectable=True)
-    if not ble_device:
-        _LOGGER.error("Could not find Bluetooth device with address %s", address)
-        return False
-
-    device_instance = device.GenericBTDevice(ble_device)
-
-    coordinator_instance = coordinator.GenericBTCoordinator(
-        hass,
-        _LOGGER,
-        ble_device,
-        device_instance,
-        entry.title,
-        entry.unique_id,
-        connectable=True
+    ble_address = entry.data.get("address")
+    ble_device = await hass.components.bluetooth.async_ble_device_from_address(
+        ble_address, connectable=True
     )
 
-    await coordinator_instance.initialize()
-
-    hass.data[DOMAIN][entry.entry_id] = coordinator_instance
-
-    if not await coordinator_instance.async_wait_ready():
-        _LOGGER.error("Device at address %s is not ready", address)
+    if not ble_device:
+        _LOGGER.error("Bluetooth device not found: %s", ble_address)
         return False
 
-    await hass.config_entries.async_forward_entry_setups(entry, ["binary_sensor", "sensor", "button"])
+    device_name = ble_device.name or ble_address
+    base_unique_id = f"{DOMAIN}_{ble_address}"
 
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    device = GenericBTDevice(ble_device)
+
+    coordinator = GenericBTCoordinator(
+        hass,
+        ble_device,
+        device,
+        device_name,
+        base_unique_id
+    )
+
+    await coordinator.async_connect()
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    # Set up platforms (sensors, binary sensors, buttons)
+    hass.async_create_task(
+        hass.config_entries.async_forward_entry_setups(entry, ("sensor", "binary_sensor", "button"))
+    )
 
     return True
 
-async def _async_update_listener(hass: HomeAssistant, entry):
-    """Handle options update."""
-    await hass.config_entries.async_reload(entry.entry_id)
-
-async def async_unload_entry(hass: HomeAssistant, entry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, ["binary_sensor", "sensor", "button"])
+    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
+
+    await coordinator.async_disconnect()
+
+    unload_ok = all(
+        await asyncio.gather(
+            *[
+                hass.config_entries.async_forward_entry_unload(entry, platform)
+                for platform in ("sensor", "binary_sensor", "button")
+            ]
+        )
+    )
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
