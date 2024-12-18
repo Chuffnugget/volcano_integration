@@ -7,14 +7,14 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import GenericBTCoordinator
+from .coordinator import VolcanoCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up Volcano Integration sensor based on a config entry."""
-    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
+    """Set up Volcano Integration sensors based on a config entry."""
+    coordinator: VolcanoCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     sensors = [
         VolcanoTemperatureSensor(coordinator),
@@ -27,7 +27,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 class VolcanoTemperatureSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Volcano Temperature Sensor."""
 
-    def __init__(self, coordinator: GenericBTCoordinator):
+    def __init__(self, coordinator: VolcanoCoordinator):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_name = "Volcano Temperature"
