@@ -1,91 +1,51 @@
-from bleak import BleakClient
-from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.core import HomeAssistant
-from .bluetooth_queue import BluetoothQueue
-from .settings_handler import fetch_settings
-from .const import DOMAIN
+"""Buttons for Volcano Integration."""
+from __future__ import annotations
+
 import logging
 
+from homeassistant.components.button import ButtonEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import DOMAIN, UUID_HEAT_ON, UUID_HEAT_OFF
+from .coordinator import GenericBTCoordinator
+from .entity import GenericBTEntity
+
 _LOGGER = logging.getLogger(__name__)
-ADDRESS = "CE:9E:A6:43:25:F3"
 
-class BluetoothStatusSensor(ButtonEntity):
-    """Sensor to show Bluetooth connection status."""
-
-    def __init__(self):
-        self._attr_name = "Bluetooth Connection Status"
-        self._state = "Disconnected"
-
-    @property
-    def state(self):
-        return self._state
-
-    def set_status(self, status: str):
-        self._state = status
-        _LOGGER.info("Bluetooth status updated: %s", status)
-        self.async_write_ha_state()
-
-class ConnectBluetoothButton(ButtonEntity):
-    """Button to connect to the Bluetooth device."""
-
-    def __init__(self, hass: HomeAssistant, status_sensor: BluetoothStatusSensor):
-        self._hass = hass
-        self._status_sensor = status_sensor
-
-    @property
-    def name(self):
-        return "Connect Bluetooth"
-
-    async def async_press(self):
-        client = self._hass.data[DOMAIN].get("bluetooth_client")
-        if client:
-            await client.disconnect()
-
-        client = BleakClient(ADDRESS)
-        queue = BluetoothQueue(client, self._status_sensor)
-        self._hass.data[DOMAIN]["bluetooth_client"] = client
-        self._hass.data[DOMAIN]["bluetooth_queue"] = queue
-        await queue.connect()
-        await queue.start()
-
-class DisconnectBluetoothButton(ButtonEntity):
-    """Button to disconnect from the Bluetooth device."""
-
-    def __init__(self, hass: HomeAssistant, status_sensor: BluetoothStatusSensor):
-        self._hass = hass
-        self._status_sensor = status_sensor
-
-    @property
-    def name(self):
-        return "Disconnect Bluetooth"
-
-    async def async_press(self):
-        queue = self._hass.data[DOMAIN].get("bluetooth_queue")
-        if queue:
-            await queue.disconnect()
-        self._status_sensor.set_status("Disconnected")
-
-class GetSettingsButton(ButtonEntity):
-    """Button to fetch settings values."""
-
-    def __init__(self, hass: HomeAssistant):
-        self._hass = hass
-
-    @property
-    def name(self):
-        return "Get Settings"
-
-    async def async_press(self):
-        await fetch_settings(self._hass)
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    status_sensor = BluetoothStatusSensor()
-    hass.data[DOMAIN]["bluetooth_status_sensor"] = status_sensor
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    """Set up Buttons for Volcano Integration based on a config entry."""
+    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([
-        ConnectBluetoothButton(hass, status_sensor),
-        DisconnectBluetoothButton(hass, status_sensor),
-        GetSettingsButton(hass),
-        status_sensor,
+        HeatOnButton(coordinator),
+        HeatOffButton(coordinator)
     ])
+
+class HeatOnButton(GenericBTEntity, ButtonEntity):
+    """Button to turn the heat on."""
+
+    _attr_name = "Heat On"
+    _attr_icon = "mdi:fire"
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        try:
+            await self._device.write_gatt(UUID_HEAT_ON, "01")  # Replace "01" with the appropriate command
+            _LOGGER.info("Heat turned on")
+        except Exception as e:
+            _LOGGER.error("Failed to turn heat on: %s", e)
+
+class HeatOffButton(GenericBTEntity, ButtonEntity):
+    """Button to turn the heat off."""
+
+    _attr_name = "Heat Off"
+    _attr_icon = "mdi:fire-off"
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        try:
+            await self._device.write_gatt(UUID_HEAT_OFF, "00")  # Replace "00" with the appropriate command
+            _LOGGER.info("Heat turned off")
+        except Exception as e:
+            _LOGGER.error("Failed to turn heat off: %s", e)
