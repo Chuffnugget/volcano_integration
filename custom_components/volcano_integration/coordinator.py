@@ -1,33 +1,27 @@
-"""Provides the DataUpdateCoordinator for Volcano Integration."""
-from __future__ import annotations
+# coordinator.py
+"""Coordinator for Volcano Integration."""
 
 import asyncio
-import contextlib
 import logging
 
-from homeassistant.components import bluetooth
-from homeassistant.components.bluetooth.active_update_coordinator import ActiveBluetoothDataUpdateCoordinator
-from homeassistant.core import CoreState, HomeAssistant, callback
-from bleak.backends.device import BLEDevice
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .device import GenericBTDevice
-from .const import DOMAIN, DEVICE_STARTUP_TIMEOUT_SECONDS, CONF_ADDRESS
+from .const import DEVICE_STARTUP_TIMEOUT_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
 
-class GenericBTCoordinator(ActiveBluetoothDataUpdateCoordinator[None]):
-    """Class to manage fetching generic Bluetooth data."""
+class GenericBTCoordinator(DataUpdateCoordinator):
+    """DataUpdateCoordinator for Generic Bluetooth devices."""
 
-    def __init__(self, hass: HomeAssistant, logger: logging.Logger, ble_device: BLEDevice, device: GenericBTDevice, device_name: str, base_unique_id: str, connectable: bool) -> None:
-        """Initialize global generic Bluetooth data updater."""
+    def __init__(self, hass: HomeAssistant, ble_device, device, device_name, base_unique_id):
+        """Initialize the coordinator."""
         super().__init__(
-            hass=hass,
-            logger=logger,
-            address=ble_device.address,
-            needs_poll_method=self._needs_poll,
-            poll_method=self._async_update,
-            mode=bluetooth.BluetoothScanningMode.ACTIVE,
-            connectable=connectable
+            hass,
+            _LOGGER,
+            name=device_name,
+            update_interval=None  # Handle updates manually
         )
         self.ble_device = ble_device
         self.device = device
@@ -35,48 +29,28 @@ class GenericBTCoordinator(ActiveBluetoothDataUpdateCoordinator[None]):
         self.base_unique_id = base_unique_id
         self._ready_event = asyncio.Event()
         self._was_unavailable = True
+        self.bt_device = GenericBTDevice(ble_device)
 
-    @callback
-    def _needs_poll(self, service_info: bluetooth.BluetoothServiceInfoBleak, seconds_since_last_poll: float | None) -> bool:
-        """Determine if polling is needed."""
-        return (
-            self.hass.state == CoreState.running
-            and self.device.poll_needed(seconds_since_last_poll)
-            and bool(
-                bluetooth.async_ble_device_from_address(
-                    self.hass, service_info.device.address, connectable=True
-                )
-            )
-        )
-
-    async def _async_update(self, service_info: bluetooth.BluetoothServiceInfoBleak) -> None:
-        """Poll the device."""
-        await self.device.update()
-
-    @callback
-    def _async_handle_unavailable(self, service_info: bluetooth.BluetoothServiceInfoBleak) -> None:
-        """Handle the device going unavailable."""
-        super()._async_handle_unavailable(service_info)
-        self._was_unavailable = True
-
-    @callback
-    def _async_handle_bluetooth_event(self, service_info: bluetooth.BluetoothServiceInfoBleak, change: bluetooth.BluetoothChange) -> None:
-        """Handle a Bluetooth event."""
-        self.ble_device = service_info.device
-        _LOGGER.debug(f"{DOMAIN} - _async_handle_bluetooth_event - {service_info} - {self.ble_device}")
+    async def async_connect(self):
+        """Connect to the Bluetooth device."""
+        await self.bt_device.connect()
         self._ready_event.set()
 
-        if not self._was_unavailable:
-            return
+    async def async_disconnect(self):
+        """Disconnect from the Bluetooth device."""
+        await self.bt_device.disconnect()
+        self._ready_event.clear()
 
-        self._was_unavailable = False
-        self.device.update_from_advertisement(service_info.advertisement)
-        super()._async_handle_bluetooth_event(service_info, change)
+    async def async_update_data(self):
+        """Fetch data from the device."""
+        # Implement your data fetching logic here
+        pass
 
-    async def async_wait_ready(self) -> bool:
-        """Wait for the device to be ready."""
-        with contextlib.suppress(asyncio.TimeoutError):
-            async with asyncio.timeout(DEVICE_STARTUP_TIMEOUT_SECONDS):
-                await self._ready_event.wait()
-                return True
-        return False
+    async def wait_ready(self) -> bool:
+        """Wait until the device is ready."""
+        try:
+            await asyncio.wait_for(self._ready_event.wait(), timeout=DEVICE_STARTUP_TIMEOUT_SECONDS)
+            return True
+        except asyncio.TimeoutError:
+            _LOGGER.error("Device did not become ready within timeout")
+            return False
