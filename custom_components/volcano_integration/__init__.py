@@ -8,8 +8,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .coordinator import GenericBTCoordinator
-from .device import GenericBTDevice
+from .coordinator import VolcanoCoordinator
+from .device import VolcanoBTDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +21,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("No Bluetooth address found in config entry.")
         return False
 
-    # Import the async_ble_device_from_address function directly
     from homeassistant.components.bluetooth import async_ble_device_from_address
 
     try:
@@ -39,9 +38,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_name = ble_device.name or ble_address
     base_unique_id = f"{DOMAIN}_{ble_address}"
 
-    device = GenericBTDevice(ble_device)
+    device = VolcanoBTDevice(ble_device)
 
-    coordinator = GenericBTCoordinator(
+    coordinator = VolcanoCoordinator(
         hass,
         ble_device,
         device,
@@ -64,7 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: VolcanoCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     await coordinator.async_disconnect()
 
