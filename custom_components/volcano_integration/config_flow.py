@@ -9,7 +9,10 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.components.bluetooth import BluetoothServiceInfoBleak, async_discovered_service_info
+from homeassistant.components.bluetooth import (
+    BluetoothServiceInfoBleak,
+    async_discovered_service_info,
+)
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.data_entry_flow import FlowResult
 
@@ -17,6 +20,7 @@ from .const import DOMAIN
 from .device import GenericBTDevice
 
 _LOGGER = logging.getLogger(__name__)
+
 
 class VolcanoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Volcano Integration."""
@@ -28,16 +32,22 @@ class VolcanoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
 
-    async def async_step_bluetooth(self, discovery_info: BluetoothServiceInfoBleak) -> FlowResult:
-        """Handle the Bluetooth discovery step."""
+    async def async_step_bluetooth(
+        self, discovery_info: BluetoothServiceInfoBleak
+    ) -> FlowResult:
+        """Handle a discovered Bluetooth device."""
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
         self._discovery_info = discovery_info
-        self.context["title_placeholders"] = {"name": discovery_info.name or discovery_info.address}
+        self.context["title_placeholders"] = {
+            "name": discovery_info.name or discovery_info.address
+        }
         return await self.async_step_user()
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Handle the user step to pick discovered device."""
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the user step to select a device."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -48,25 +58,27 @@ class VolcanoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_show_form(
                     step_id="user",
                     data_schema=self._user_schema(),
-                    errors=errors
+                    errors=errors,
                 )
             device = GenericBTDevice(discovery_info.device)
             try:
-                await device.update()
-            except (TimeoutError, BleakError):
+                await device.connect()
+                await device.disconnect()
+            except Exception as e:
+                _LOGGER.error("Cannot connect to device: %s", e)
                 errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected error")
-                errors["base"] = "unknown"
-            else:
-                await device.stop()
-                return self.async_create_entry(
-                    title=discovery_info.name or address,
-                    data={CONF_ADDRESS: discovery_info.address}
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=self._user_schema(),
+                    errors=errors,
                 )
+            return self.async_create_entry(
+                title=discovery_info.name or address,
+                data={CONF_ADDRESS: discovery_info.address},
+            )
 
-        if discovery := self._discovery_info:
-            self._discovered_devices[discovery.address] = discovery
+        if self._discovery_info:
+            self._discovered_devices[self._discovery_info.address] = self._discovery_info
         else:
             current_addresses = self._async_current_ids()
             async for discovery in async_discovered_service_info(self.hass):
@@ -83,7 +95,7 @@ class VolcanoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=self._user_schema(),
-            errors=errors
+            errors=errors,
         )
 
     def _user_schema(self):
