@@ -1,37 +1,40 @@
-"""Binary sensors for Volcano Integration."""
-from __future__ import annotations
-
-import logging
+# binary_sensor.py
+"""Binary Sensor platform for Volcano Integration."""
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, Schema
 from .coordinator import GenericBTCoordinator
-from .entity import GenericBTEntity
+from .const import DOMAIN, UUID_HEAT_CONTROL
 
-_LOGGER = logging.getLogger(__name__)
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry,
+    async_add_entities: AddEntitiesCallback,
+):
+    """Set up the Volcano binary sensors."""
+    coordinator: GenericBTCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    async_add_entities([VolcanoHeatStatusBinarySensor(coordinator)], True)
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    """Set up Binary Sensors for Volcano Integration based on a config entry."""
-    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        BluetoothStatusSensor(coordinator)
-    ])
+class VolcanoHeatStatusBinarySensor(BinarySensorEntity):
+    """Representation of a Volcano Heat Status Binary Sensor."""
 
-    platform = hass.helpers.entity_platform.async_get_current_platform()
-    platform.async_register_entity_service("write_gatt", Schema.WRITE_GATT.value, "write_gatt")
-    platform.async_register_entity_service("read_gatt", Schema.READ_GATT.value, "read_gatt")
-
-class BluetoothStatusSensor(GenericBTEntity, BinarySensorEntity):
-    """Representation of a Bluetooth connection status binary sensor."""
-
-    _attr_name = "Bluetooth Status"
-    _attr_icon = "mdi:bluetooth"
+    def __init__(self, coordinator: GenericBTCoordinator):
+        """Initialize the binary sensor."""
+        self.coordinator = coordinator
+        self._attr_name = f"{coordinator.device_name} Heat Status"
+        self._attr_unique_id = f"{coordinator.base_unique_id}_heat_status"
+        self._attr_device_class = "power"
 
     @property
-    def is_on(self) -> bool:
-        """Return True if the device is connected."""
-        return self._device.connected
+    def is_on(self):
+        """Return true if the heat is on."""
+        # Implement logic to determine heat status from coordinator data
+        # Example:
+        return bool(self.coordinator.data)
+
+    async def async_added_to_hass(self):
+        """Register update callback."""
+        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))
+        await self.coordinator.async_refresh()
