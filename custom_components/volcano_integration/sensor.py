@@ -1,69 +1,40 @@
-"""Sensors for Volcano Integration."""
-from __future__ import annotations
-
-import logging
+# sensor.py
+"""Sensor platform for Volcano Integration."""
 
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import TEMP_CELSIUS
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, UUID_HEAT_ON, UUID_HEAT_OFF
 from .coordinator import GenericBTCoordinator
-from .entity import GenericBTEntity
+from .const import DOMAIN, UUID_TEMPERATURE
 
-_LOGGER = logging.getLogger(__name__)
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry,
+    async_add_entities: AddEntitiesCallback,
+):
+    """Set up the Volcano sensors."""
+    coordinator: GenericBTCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    async_add_entities([VolcanoTemperatureSensor(coordinator)], True)
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    """Set up Sensors for Volcano Integration based on a config entry."""
-    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        CurrentTemperatureSensor(coordinator),
-        HeatStatusSensor(coordinator)
-    ])
+class VolcanoTemperatureSensor(SensorEntity):
+    """Representation of a Volcano Temperature Sensor."""
 
-class HeatStatusSensor(GenericBTEntity, SensorEntity):
-    """Representation of the Heat Status."""
-
-    _attr_name = "Heat Status"
-    _attr_icon = "mdi:fire"
-    _attr_state_class = None
-    _attr_unit_of_measurement = None
-
-    def __init__(self, coordinator: GenericBTCoordinator) -> None:
-        """Initialize the heat status sensor."""
-        super().__init__(coordinator)
-        self._status = "Unknown"
-        self._update_task = asyncio.create_task(self._update_status())
+    def __init__(self, coordinator: GenericBTCoordinator):
+        """Initialize the sensor."""
+        self.coordinator = coordinator
+        self._attr_name = f"{coordinator.device_name} Temperature"
+        self._attr_unique_id = f"{coordinator.base_unique_id}_temperature"
+        self._attr_unit_of_measurement = TEMP_CELSIUS
+        self._attr_device_class = "temperature"
 
     @property
     def state(self):
         """Return the state of the sensor."""
-        return self._status
+        return self.coordinator.data
 
-    async def _update_status(self):
-        """Fetch heat status periodically."""
-        while True:
-            try:
-                # Read Heat On UUID
-                on_data = await self._device.read_gatt(UUID_HEAT_ON)
-                # Read Heat Off UUID
-                off_data = await self._device.read_gatt(UUID_HEAT_OFF)
-
-                # Determine heat status based on UUIDs
-                if on_data and any(b != 0 for b in on_data):
-                    self._status = "On"
-                elif off_data and any(b != 0 for b in off_data):
-                    self._status = "Off"
-                else:
-                    self._status = "Unknown"
-
-                self.async_write_ha_state()
-            except Exception as e:
-                _LOGGER.error("Error reading heat status: %s", e)
-            await asyncio.sleep(5)  # Adjust polling interval as needed
-
-    async def async_will_remove_from_hass(self):
-        """Cleanup when entity is removed."""
-        self._update_task.cancel()
-        await super().async_will_remove_from_hass()
+    async def async_added_to_hass(self):
+        """Register update callback."""
+        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))
+        await self.coordinator.async_refresh()
