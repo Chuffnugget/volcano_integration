@@ -1,51 +1,59 @@
-"""Buttons for Volcano Integration."""
-from __future__ import annotations
-
-import logging
+# button.py
+"""Button platform for Volcano Integration."""
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, UUID_HEAT_ON, UUID_HEAT_OFF
 from .coordinator import GenericBTCoordinator
-from .entity import GenericBTEntity
+from .const import DOMAIN, UUID_HEAT_CONTROL
 
-_LOGGER = logging.getLogger(__name__)
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    """Set up Buttons for Volcano Integration based on a config entry."""
-    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry,
+    async_add_entities: AddEntitiesCallback,
+):
+    """Set up the Volcano buttons."""
+    coordinator: GenericBTCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities([
-        HeatOnButton(coordinator),
-        HeatOffButton(coordinator)
-    ])
+        VolcanoHeatOnButton(coordinator),
+        VolcanoHeatOffButton(coordinator)
+    ], True)
 
-class HeatOnButton(GenericBTEntity, ButtonEntity):
-    """Button to turn the heat on."""
+class VolcanoHeatOnButton(ButtonEntity):
+    """Button to turn heat on."""
 
-    _attr_name = "Heat On"
-    _attr_icon = "mdi:fire"
+    def __init__(self, coordinator: GenericBTCoordinator):
+        """Initialize the button."""
+        self.coordinator = coordinator
+        self._attr_name = f"{coordinator.device_name} Heat On"
+        self._attr_unique_id = f"{coordinator.base_unique_id}_heat_on"
 
-    async def async_press(self) -> None:
+    async def async_press(self):
         """Handle the button press."""
         try:
-            await self._device.write_gatt(UUID_HEAT_ON, "01")  # Replace "01" with the appropriate command
-            _LOGGER.info("Heat turned on")
+            # Implement the logic to turn heat on
+            # Example: Write a specific value to a GATT characteristic
+            await self.coordinator.bt_device.write_gatt_char(UUID_HEAT_CONTROL, b'\x01')
+            await self.coordinator.async_refresh()
         except Exception as e:
             _LOGGER.error("Failed to turn heat on: %s", e)
 
-class HeatOffButton(GenericBTEntity, ButtonEntity):
-    """Button to turn the heat off."""
+class VolcanoHeatOffButton(ButtonEntity):
+    """Button to turn heat off."""
 
-    _attr_name = "Heat Off"
-    _attr_icon = "mdi:fire-off"
+    def __init__(self, coordinator: GenericBTCoordinator):
+        """Initialize the button."""
+        self.coordinator = coordinator
+        self._attr_name = f"{coordinator.device_name} Heat Off"
+        self._attr_unique_id = f"{coordinator.base_unique_id}_heat_off"
 
-    async def async_press(self) -> None:
+    async def async_press(self):
         """Handle the button press."""
         try:
-            await self._device.write_gatt(UUID_HEAT_OFF, "00")  # Replace "00" with the appropriate command
-            _LOGGER.info("Heat turned off")
+            # Implement the logic to turn heat off
+            # Example: Write a specific value to a GATT characteristic
+            await self.coordinator.bt_device.write_gatt_char(UUID_HEAT_CONTROL, b'\x00')
+            await self.coordinator.async_refresh()
         except Exception as e:
             _LOGGER.error("Failed to turn heat off: %s", e)
