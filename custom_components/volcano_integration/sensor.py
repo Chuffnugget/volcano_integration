@@ -1,53 +1,57 @@
+"""Sensors for Volcano Integration."""
+from __future__ import annotations
+
+import logging
+import asyncio
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
-from .bluetooth_queue import BluetoothQueue
-import logging
-from .const import DOMAIN
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import DOMAIN, UUID_TEMPERATURE
+from .coordinator import GenericBTCoordinator
+from .entity import GenericBTEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-# UUIDs
-TEMPERATURE_UUID = "10110001-5354-4f52-5a26-4249434b454c"
-FAN_ON_UUID = "10110013-5354-4f52-5a26-4249434b454c"
-FAN_OFF_UUID = "10110014-5354-4f52-5a26-4249434b454c"
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    """Set up Sensors for Volcano Integration based on a config entry."""
+    coordinator: GenericBTCoordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([CurrentTemperatureSensor(coordinator)])
 
-class PeriodicBluetoothSensor(SensorEntity):
-    """Sensor for periodically updated Bluetooth values."""
+class CurrentTemperatureSensor(GenericBTEntity, SensorEntity):
+    """Representation of the Current Temperature."""
 
-    def __init__(self, hass, name, uuid, decode, interval):
-        self._hass = hass
-        self._name = name
-        self._uuid = uuid
-        self._decode = decode
-        self._interval = interval
-        self._state = None
+    _attr_name = "Current Temperature"
+    _attr_unit_of_measurement = "°C"
+    _attr_icon = "mdi:thermometer"
 
-    @property
-    def name(self):
-        return self._name
+    def __init__(self, coordinator: GenericBTCoordinator) -> None:
+        """Initialize the temperature sensor."""
+        super().__init__(coordinator)
+        self._temperature = None
+        self._update_task = asyncio.create_task(self._update_temperature())
 
     @property
     def state(self):
-        return self._state
+        """Return the state of the sensor."""
+        return self._temperature
 
-    async def async_added_to_hass(self):
-        self._hass.loop.create_task(self._periodic_update())
-
-    async def _periodic_update(self):
-        queue: BluetoothQueue = self._hass.data[DOMAIN].get("bluetooth_queue")
+    async def _update_temperature(self):
+        """Fetch temperature every second."""
         while True:
             try:
-                value = await queue.read_gatt_char(self._uuid)
-                self._state = self._decode(value)
-                self.async_write_ha_state()
+                data = await self._device.read_gatt(UUID_TEMPERATURE)
+                if data:
+                    # Assuming temperature is a 2-byte little-endian integer
+                    self._temperature = int.from_bytes(data[:2], byteorder='little') / 100  # Adjust as per device specs
+                    self.async_write_ha_state()
             except Exception as e:
-                _LOGGER.error("Error updating %s: %s", self._name, e)
-            await asyncio.sleep(self._interval)
+                _LOGGER.error("Error reading temperature: %s", e)
+            await asyncio.sleep(1)  # Update every second
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    sensors = [
-        PeriodicBluetoothSensor(hass, "Volcano Temperature", TEMPERATURE_UUID, lambda v: int.from_bytes(v, "little") / 10, 0.5),
-    ]
-    async_add_entities(sensors)
+    async def async_will_remove_from_hass(self):
+        """Cleanup when entity is removed."""
+        self._update_task.cancel()
+        await super().async_will_remove_from_hass()
