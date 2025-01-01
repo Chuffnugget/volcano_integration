@@ -33,6 +33,7 @@ class VolcanoHeaterTempNumber(NumberEntity):
         self._manager = manager
         self._attr_name = "Volcano Heater Temperature Setpoint"
         self._attr_unique_id = "volcano_heater_temperature_setpoint"
+        self._attr_icon = "mdi:thermometer"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_device_info = {
             "identifiers": {(DOMAIN, BT_DEVICE_ADDRESS)},
