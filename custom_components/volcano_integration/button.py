@@ -55,6 +55,7 @@ class VolcanoConnectButton(VolcanoBaseButton):
         super().__init__(manager)
         self._attr_name = "Volcano Connect"
         self._attr_unique_id = "volcano_connect_button"
+        self._attr_icon = "mdi:bluetooth-connect"
 
     async def async_press(self) -> None:
         """Called when user presses the Connect button in HA."""
@@ -69,6 +70,7 @@ class VolcanoDisconnectButton(VolcanoBaseButton):
         super().__init__(manager)
         self._attr_name = "Volcano Disconnect"
         self._attr_unique_id = "volcano_disconnect_button"
+        self._attr_icon = "mdi:bluetooth-off"
 
     async def async_press(self) -> None:
         """Called when user presses the Disconnect button in HA."""
@@ -86,6 +88,7 @@ class VolcanoPumpOnButton(VolcanoBaseButton):
         super().__init__(manager)
         self._attr_name = "Volcano Pump On"
         self._attr_unique_id = "volcano_pump_on_button"
+        self._attr_icon = "mdi:air-purifier"
 
     async def async_press(self) -> None:
         """Called when user presses the Pump On button."""
@@ -100,6 +103,7 @@ class VolcanoPumpOffButton(VolcanoBaseButton):
         super().__init__(manager)
         self._attr_name = "Volcano Pump Off"
         self._attr_unique_id = "volcano_pump_off_button"
+        self._attr_icon = "mdi:air-purifier-off"
 
     async def async_press(self) -> None:
         """Called when user presses the Pump Off button."""
@@ -117,6 +121,7 @@ class VolcanoHeatOnButton(VolcanoBaseButton):
         super().__init__(manager)
         self._attr_name = "Volcano Heat On"
         self._attr_unique_id = "volcano_heat_on_button"
+        self._attr_icon = "mdi:fire"
 
     async def async_press(self) -> None:
         """Called when user presses the Heat On button."""
@@ -131,6 +136,7 @@ class VolcanoHeatOffButton(VolcanoBaseButton):
         super().__init__(manager)
         self._attr_name = "Volcano Heat Off"
         self._attr_unique_id = "volcano_heat_off_button"
+        self._attr_icon = "mdi:fire-off"
 
     async def async_press(self) -> None:
         """Called when user presses the Heat Off button."""
