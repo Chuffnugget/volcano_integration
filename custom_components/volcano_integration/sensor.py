@@ -47,6 +47,7 @@ class VolcanoCurrentTempSensor(VolcanoBaseSensor):
         super().__init__(manager)
         self._attr_name = "Volcano Current Temperature"
         self._attr_unique_id = "volcano_current_temperature"
+        self._attr_icon = "mdi:thermometer"
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
         self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         self._attr_device_info = {
@@ -76,6 +77,7 @@ class VolcanoHeatStatusSensor(VolcanoBaseSensor):
         super().__init__(manager)
         self._attr_name = "Volcano Heat Status"
         self._attr_unique_id = "volcano_heat_status"
+        self._attr_icon = "mdi:fire"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, BT_DEVICE_ADDRESS)},
             "name": "Volcano Vaporizer",
@@ -103,6 +105,7 @@ class VolcanoPumpStatusSensor(VolcanoBaseSensor):
         super().__init__(manager)
         self._attr_name = "Volcano Pump Status"
         self._attr_unique_id = "volcano_pump_status"
+        self._attr_icon = "mdi:air-purifier"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, BT_DEVICE_ADDRESS)},
             "name": "Volcano Vaporizer",
