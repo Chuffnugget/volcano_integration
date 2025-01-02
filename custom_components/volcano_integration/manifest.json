@@ -1,7 +1,7 @@
 {
   "domain": "volcano_integration",
   "name": "Volcano Integration",
-  "version": "1.9.0",
+  "version": "1.9.8",
   "documentation": "https://github.com/Chuffnugget/volcano_integration",
   "issue_tracker": "https://github.com/Chuffnugget/volcano_integration/issues",
   "dependencies": [],
