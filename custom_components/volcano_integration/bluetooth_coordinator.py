@@ -31,8 +31,8 @@ VALID_PATTERNS = {
     (0x00, 0x00): ("OFF", "OFF"),
     (0x00, 0x30): ("OFF", "ON"),
     (0x23, 0x30): ("ON", "ON"),
-    (0x23, 0x06): ("BURST_STARTED", "ON"),
-    (0x23, 0x26): ("BURST_ENDED", "ON"),
+    (0x23, 0x06): ("ON (BURSTING)", "ON"),
+    (0x23, 0x26): ("ON (TARGET MET)", "ON"),
 }
 
 
