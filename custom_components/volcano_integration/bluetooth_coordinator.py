@@ -11,7 +11,7 @@ from .const import (
     BT_STATUS_CONNECTED,
     BT_STATUS_ERROR,
     VIBRATION_BIT_MASK,
-    # REGISTER1_UUID,  # Removed duplicate to prevent conflicts
+    REGISTER1_UUID,
     REGISTER2_UUID,
     REGISTER3_UUID,
     UUID_TEMP,
@@ -79,7 +79,6 @@ class VolcanoBTManager:
         self._temp_poll_task = None
         self._stop_event = asyncio.Event()
         self._sensors = []
-        self.slot_bluetooth_error = False
 
     @property
     def bt_status(self):
@@ -88,7 +87,7 @@ class VolcanoBTManager:
 
     @bt_status.setter
     def bt_status(self, value):
-        """Set the Bluetooth status and notify sensors/entities."""
+        """Set the Bluetooth status and notify sensors/buttons."""
         if self._bt_status != value:
             _LOGGER.debug("BT status changed from %s to %s", self._bt_status, value)
             self._bt_status = value
@@ -341,7 +340,7 @@ class VolcanoBTManager:
             await self._client.start_notify(UUID_PUMP_NOTIFICATIONS, notification_handler)
             _LOGGER.info("Subscribed to pump notifications.")
         except BleakError as e:
-            _LOGGER.warning("Error subscribing to notifications: %s", e)
+            _LOGGER.warning("Error subscribing to pump notifications: %s", e)
 
     async def _poll_temperature(self):
         """Poll temperature at regular intervals."""
@@ -359,6 +358,7 @@ class VolcanoBTManager:
             if len(data) >= 2:
                 raw_16 = int.from_bytes(data[:2], byteorder="little", signed=False)
                 self.current_temperature = raw_16 / 10.0
+                _LOGGER.debug("Temperature read: %.1f°C", self.current_temperature)
             else:
                 self.current_temperature = None
                 _LOGGER.warning("Received incomplete temperature data: %s", data)
@@ -407,7 +407,7 @@ class VolcanoBTManager:
         payload = int(safe_temp * 10).to_bytes(2, byteorder="little")
         try:
             await self._client.write_gatt_char(UUID_HEATER_SETPOINT, payload)
-            _LOGGER.info("Heater temperature set to %s °C.", safe_temp)
+            _LOGGER.info("Heater temperature set to %.1f °C.", safe_temp)
         except BleakError as e:
             _LOGGER.error("Error writing heater temperature: %s", e)
 
@@ -422,13 +422,10 @@ class VolcanoBTManager:
             await self._client.write_gatt_char(UUID_LED_BRIGHTNESS, payload)
             self.led_brightness = clamped_brightness
             self._notify_sensors()
-            _LOGGER.info("LED Brightness set to %d", clamped_brightness)
+            _LOGGER.info("LED Brightness set to %d%%", clamped_brightness)
         except BleakError as e:
             _LOGGER.error("Error writing LED brightness: %s", e)
 
-    #
-    # NEW: set_auto_shutoff(enabled) -> writes 0x00 or 0x01 to the same UUID
-    #
     async def set_auto_shutoff(self, enabled: bool):
         """Enable/Disable Auto Shutoff by writing 0x01 (ON) or 0x00 (OFF)."""
         if not self._connected or not self._client:
@@ -443,16 +440,13 @@ class VolcanoBTManager:
         except BleakError as e:
             _LOGGER.error("Error writing Auto Shutoff: %s", e)
 
-    #
-    # NEW: set_auto_shutoff_setting(minutes) -> writes 2-byte little-endian of (minutes*60)
-    #
     async def set_auto_shutoff_setting(self, minutes: int):
         """Write the Auto Shutoff Setting in minutes (converted to seconds)."""
         if not self._connected or not self._client:
             _LOGGER.warning("Cannot set Auto Shutoff Setting - not connected.")
             return
 
-        # Optional: Clamp the range, e.g., 5..240 minutes
+        # Clamp the range if desired, e.g., 5..240 minutes
         # minutes = max(5, min(minutes, 240))
 
         total_seconds = minutes * 60
