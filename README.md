@@ -9,10 +9,11 @@ A custom Home Assistant integration to connect and control the **Storz & Bickel 
 ## Features
 
 - **Temperature Control**: Set the heater temperature between 40°C and 230°C with 1°C precision.
-- **Pump Control**: Turn the pump **ON** or **OFF** to start or stop air circulation.
+- **Pump & Heat Control**: Turn the pump and heat **ON** or **OFF** individually.
 - **Real-Time Temperature Monitoring**: Monitor the current heater temperature in real-time.
 - **Bluetooth Status**: View the current Bluetooth connection status (Connected, Disconnected, etc.).
-- **Full Automation Support**: Automate heat, pump, and temperature settings using Home Assistant scripts or automations.
+- **Device Configuration**: Control the LED screen brightness and auto shut-off timer.
+- **Full Automation/Scripting Support**: Use services and device entities to build your own vaporization workflows.
 - **User-Friendly Services**: Use built-in Home Assistant services to control the vaporizer.
 
 ---
