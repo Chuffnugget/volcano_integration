@@ -1,9 +1,8 @@
 # Volcano Integration for Home Assistant
 
-[![HACS][hacs]][hacs-url]
-![HACS Action](https://github.com/Chuffnugget/volcano_integration/workflows/HACS%20Action/badge.svg)
-![hassfest](https://github.com/Chuffnugget/volcano_integration/workflows/hassfest/badge.svg)
-
+[![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/default/tree/main/integration/volcano_integration)
+[![HACS Action](https://github.com/Chuffnugget/volcano_integration/workflows/HACS%20Action/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions?query=workflow%3A%22HACS+Action%22)
+[![hassfest](https://github.com/Chuffnugget/volcano_integration/workflows/hassfest/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions?query=workflow%3Ahassfest)
 [![Release](https://img.shields.io/github/v/release/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![License](https://img.shields.io/github/license/Chuffnugget/volcano_integration)](LICENSE)
 
