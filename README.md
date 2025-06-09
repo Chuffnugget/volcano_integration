@@ -16,7 +16,7 @@
 [![HACS Action](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml)
 [![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yaml)
 [![Release](https://img.shields.io/github/v/release/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/releases)
-[![Downloads](https://img.shields.io/github/downloads/Chuffnugget/volcano_integration/latest/total)](https://github.com/Chuffnugget/volcano_integration/releases)
+[![Downloads](https://img.shields.io/github/downloads/Chuffnugget/volcano_integration/total)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![Stars](https://img.shields.io/github/stars/Chuffnugget/volcano_integration?style=social)](https://github.com/Chuffnugget/volcano_integration/stargazers)
 [![Issues](https://img.shields.io/github/issues/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/issues)
 [![License](https://img.shields.io/github/license/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/blob/main/LICENSE)
