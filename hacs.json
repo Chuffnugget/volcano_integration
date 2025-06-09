@@ -1,5 +1,8 @@
 {
-  "name": "volcano_integration",
+  "name": "Volcano Integration",
+  "domain": "volcano_integration",
+  "content_in_root": false,
   "homeassistant": "2023.7.0",
+  "hacs": "1.0.0",
   "render_readme": true
 }
