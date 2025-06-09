@@ -1,14 +1,13 @@
 {
   "domain": "volcano_integration",
   "name": "Volcano Integration",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "documentation": "https://github.com/Chuffnugget/volcano_integration",
   "issue_tracker": "https://github.com/Chuffnugget/volcano_integration/issues",
   "dependencies": [],
   "codeowners": ["@Chuffnugget"],
   "iot_class": "local_polling",
   "config_flow": true,
-  "supports_entry_removal": true,
   "requirements": [
     "bleak>=0.20.0"
   ]
