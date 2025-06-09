@@ -11,11 +11,5 @@
   "supports_entry_removal": true,
   "requirements": [
     "bleak>=0.20.0"
-  ],
-  "keywords": [
-    "Volcano",
-    "Bluetooth",
-    "Vaporizer",
-    "Temperature Control"
   ]
 }
