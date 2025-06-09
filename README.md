@@ -164,44 +164,39 @@ Now you're set to create your own scripts and automations for the Volcano Vapori
 
 ## Installation
 
-### Installation via HACS
+### Installation via HACS (Default Store)
 
 1. **Prerequisites**  
-   - Ensure you have [HACS](https://hacs.xyz/) installed in your Home Assistant setup.
+   - Ensure you have [HACS](https://hacs.xyz/) installed in your Home Assistant.
 
-2. **Add the Repository to HACS**  
-   - In Home Assistant, navigate to **HACS > Integrations**.
-   - Click the **"+"** button to add a new repository.
-   - Enter the repository URL: `https://github.com/Chuffnugget/volcano_integration`.
-   - Select **Integration** as the category.
-
-3. **Install the Integration**  
-   - After adding, find **Volcano Integration** in the HACS Integrations list.
+2. **Install the Integration**  
+   - In Home Assistant, go to **HACS → Integrations**.  
+   - Click the **“+”** button and search for **Volcano Integration**.  
    - Click **Install**.
 
-4. **Restart Home Assistant**  
-   - After installation, restart Home Assistant to activate the integration.
+3. **Restart Home Assistant**  
+   - After installation completes, restart Home Assistant to activate the integration.
 
-5. **Configure the Integration**  
-   - Navigate to **Settings > Devices & Services**, find **Volcano Integration**, and follow the setup instructions.  
-   - The configuration menu will scan for Bluetooth devices, displaying a list. Select your Volcano Vaporizer to complete the setup.
+4. **Configure the Integration**  
+   - Navigate to **Settings → Devices & Services**, click **Add Integration**, and select **Volcano Integration**.  
+   - Follow the on-screen prompts to scan for Bluetooth devices and pick your Volcano Vaporizer.
 
-### Manual Installation
+---
+
+### Manual Installation (Fallback)
 
 1. **Download the Integration**  
-   - Clone or download the repository from GitHub: [GitHub Repository](https://github.com/Chuffnugget/volcano_integration).
+   - Clone or download from GitHub:  
+     `https://github.com/Chuffnugget/volcano_integration`
 
 2. **Place in Custom Components**  
-   - Extract the files and place the `volcano_integration` folder in the `custom_components` directory within your Home Assistant configuration directory.
+   - Copy the `volcano_integration` folder into your Home Assistant’s `custom_components/` directory.
 
-3. **Install Dependencies**  
-   - Ensure the required dependencies (e.g., `bleak>=0.20.0`) are installed. Home Assistant should handle this automatically.
+3. **Restart Home Assistant**  
+   - Restart Home Assistant so it picks up the new component.
 
-4. **Restart Home Assistant**  
-   - After placing the files, restart Home Assistant.
-
-5. **Add the Integration**  
-   - Navigate to **Settings > Devices & Services > Add Integration**, search for "Volcano Integration," and follow the setup instructions.
+4. **Add & Configure**  
+   - Go to **Settings → Devices & Services → Add Integration**, choose **Volcano Integration**, and complete setup.
 
 ---
 
