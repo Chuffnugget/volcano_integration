@@ -1,10 +1,11 @@
 # Volcano Integration for Home Assistant
 
 [![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/default/tree/main/integration/volcano_integration)
-[![HACS Action](https://github.com/Chuffnugget/volcano_integration/workflows/HACS%20Action/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions?query=workflow%3A%22HACS+Action%22)
-[![hassfest](https://github.com/Chuffnugget/volcano_integration/workflows/hassfest/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions?query=workflow%3Ahassfest)
+[![HACS Action](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hacs_action.yml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hacs_action.yml)
+[![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml)
 [![Release](https://img.shields.io/github/v/release/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/releases)
-[![License](https://img.shields.io/github/license/Chuffnugget/volcano_integration)](LICENSE)
+[![License](https://img.shields.io/github/license/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/blob/main/LICENSE)
+
 
 A custom Home Assistant integration to connect and control the **Storz & Bickel Volcano Hybrid Vaporizer** via Bluetooth. This integration enables precise control over the vaporizer's heat and pump functions, real-time monitoring of temperature, and seamless automation into the Home Assistant scripting and automation systems.
 
