@@ -14,6 +14,8 @@
 
 A custom **Home Assistant integration** to connect and control the **Storz & Bickel Volcano Hybrid Vaporizer** via **Bluetooth**. This integration enables precise control over the vaporizer's heat and pump functions, real-time monitoring of temperature, and seamless automation into the Home Assistant scripting and automation systems.
 
+[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=chuffnugget&repository=volcano_integration&category=integration)
+
 > 🚀 **Volcano Integration is now published in the HACS Default Store!**  
 > If you previously added it as a custom repository, you can remove that entry under **HACS → Integrations → ⋮ → Custom Repositories** to avoid duplicates.
 
