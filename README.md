@@ -185,6 +185,7 @@ Now you're set to create your own scripts and automations for the Volcano Vapori
    - In Home Assistant, go to **HACS → Integrations**.  
    - Click the **“+”** button and search for **Volcano Integration**.  
    - Click **Install**.
+     
 [![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=chuffnugget&repository=volcano_integration&category=integration)
 
 
