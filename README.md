@@ -181,15 +181,16 @@ Now you're set to create your own scripts and automations for the Volcano Vapori
 1. **Prerequisites**  
    - Ensure you have [HACS](https://hacs.xyz/) installed in your Home Assistant.
 
-2. **Install the Integration**  
+2. **Install the Integration**
+[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=chuffnugget&repository=volcano_integration&category=integration)
    - In Home Assistant, go to **HACS → Integrations**.  
    - Click the **“+”** button and search for **Volcano Integration**.  
    - Click **Install**.
 
-3. **Restart Home Assistant**  
+4. **Restart Home Assistant**  
    - After installation completes, restart Home Assistant to activate the integration.
 
-4. **Configure the Integration**  
+5. **Configure the Integration**  
    - Navigate to **Settings → Devices & Services**, click **Add Integration**, and select **Volcano Integration**.  
    - Follow the on-screen prompts to scan for Bluetooth devices and pick your Volcano Vaporizer.
 
