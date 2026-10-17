@@ -146,11 +146,18 @@ async def test_missing_or_malformed_unit_is_unknown(hass, integration, periphera
     target_id = er.async_get(hass).async_get_entity_id(
         "number", DOMAIN, "volcano_heater_temperature_setpoint_AA:BB:CC:DD:EE:FF"
     )
-    with pytest.raises(HomeAssistantError, match="unit is unknown"):
+    if payload is None:
         await hass.services.async_call(
             "number", "set_value", {"entity_id": target_id, "value": 180}, blocking=True
         )
-    peripheral.write_gatt_char.assert_not_awaited()
+        assert peripheral.values[UUID_HEATER_SETPOINT] == (1800).to_bytes(4, "little")
+        assert hass.states.get(target_id).attributes["device_temperature_unit"] is None
+    else:
+        with pytest.raises(HomeAssistantError, match="unit is unknown"):
+            await hass.services.async_call(
+                "number", "set_value", {"entity_id": target_id, "value": 180}, blocking=True
+            )
+        peripheral.write_gatt_char.assert_not_awaited()
 
 
 @pytest.mark.parametrize("entity_unit", ["°C", "°F"])

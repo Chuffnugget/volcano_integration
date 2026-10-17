@@ -138,7 +138,10 @@ class VolcanoSensor(VolcanoEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         if self.entity_description.key == "current_temperature":
-            return {"device_temperature_unit": self.manager.state.temperature_unit}
+            return {
+                "device_temperature_unit": self.manager.state.temperature_unit,
+                "temperature_unit_fallback": self.manager.state.temperature_unit_fallback,
+            }
         if self.entity_description.key == "bt_status":
             return {"connection_requested": self.manager.connection_requested}
         if self.entity_description.key in {"heat_status", "pump_status"}:

@@ -1,7 +1,7 @@
 # Storz & Bickel Volcano Hybrid Integration for Home Assistant
 
 [![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/default/blob/master/integration)
-[![Release downloads](https://img.shields.io/github/downloads/Chuffnugget/volcano_integration/total?label=release%20downloads)](https://github.com/Chuffnugget/volcano_integration/releases)
+[![Release downloads](https://img.shields.io/github/downloads/chuffnugget/volcano_integration/total?label=release%20downloads)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![HACS Action](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml)
 [![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml)
 [![Release](https://img.shields.io/github/v/release/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/releases)
@@ -17,9 +17,7 @@ switch the heater and air pump, and run workflows as Home Assistant scripts.
 Home Assistant keeps the Bluetooth connection open, so a workflow can continue
 after you close the app on your phone.
 
-## What's new in v4.0.0
-
-Changes since [v3.2.4](https://github.com/Chuffnugget/volcano_integration/releases/tag/v3.2.4).
+## What's new in v4.0.1
 
 <img src="images/volcano-hybrid-card.png" alt="Volcano Hybrid dashboard card" width="420">
 
@@ -39,6 +37,13 @@ Changes since [v3.2.4](https://github.com/Chuffnugget/volcano_integration/releas
   setting, then reads it back to check that the change took effect.
 - Added **Temperature unit** under Configuration on the device page. It changes
   the setting on the Volcano itself. Changes made on the Volcano update HA too.
+  The selector waits for delayed updates and is unavailable when the firmware
+  has no unit register. Before any unit has been reported, an acknowledged setting
+  is accepted after ten seconds without an update, so choosing the existing unit
+  doesn't fail.
+- Temperature controls fall back to whole °C when the firmware hasn't reported
+  its display unit. The card explains the fallback and switches when the device
+  reports a unit. Polling no longer clears a unit received by notification.
 - All card colours can be changed in the card editor. Leave them as they are for
   the original appearance, or use **Reset colours** to restore it.
 
@@ -52,9 +57,18 @@ Changes since [v3.2.4](https://github.com/Chuffnugget/volcano_integration/releas
 - Switched to `bleak-retry-connector` and fixed the warning spam when a Volcano is
   unplugged or out of range. Retries start at five seconds and double up to five
   minutes. Expected connection failures go in the debug log.
-- Disconnect now turns off heat and air and checks they're off before closing
-  Bluetooth. It also cancels pending connections and retries. The power button
-  on the card does the same.
+- Fixed connections getting stuck on **Connecting** when the Bluetooth service
+  cache is incomplete, including after changing the device's temperature unit.
+  The integration clears that cache and discovers the services again.
+- Disconnect turns off heat and air before closing Bluetooth. It also cancels
+  pending connections and retries. The power button on the card does the same.
+- Shutdown confirmation supports firmware that reports heat and air through
+  notifications only. If both were already confirmed off on this connection,
+  no repeat notification is needed. An ON command invalidates that confirmation.
+- If that firmware has never reported heat or air status, Disconnect waits ten
+  seconds, then releases Bluetooth only if both OFF commands were acknowledged.
+  A Home Assistant notification asks you to check the device. Failed writes or a
+  reported ON or invalid status still leave the connection open with an error.
 - A dropped connection clears the old readings and starts reconnecting, unless
   you've asked it to disconnect.
 - Connect waits for the initial readings and status updates to be set up before
@@ -99,8 +113,9 @@ Changes since [v3.2.4](https://github.com/Chuffnugget/volcano_integration/releas
   arriving from an old connection are ignored.
 - Entities now share their readings instead of each handling updates separately.
   The device page shows the Volcano's firmware version. Firmware details are
-  updated when read, rather than every time a sensor changes. Fixed the firmware
-  lookup warning on newer versions of HA.
+  updated when read, rather than every time a sensor changes. Fixed deprecated
+  firmware and device-configuration lookups on newer HA versions, while keeping
+  support for older versions.
 - Added **Download diagnostics**. The report leaves out the Bluetooth address
   and device name and hides the serial number. The Bluetooth status sensor also
   has a `connection_requested` attribute to show whether retries are still running.
@@ -108,12 +123,15 @@ Changes since [v3.2.4](https://github.com/Chuffnugget/volcano_integration/releas
   the last Volcano removes the card resource; adding one again restores it.
 - Home Assistant now supplies the Bluetooth libraries, so the integration no
   longer installs its own version of Bleak. Requires HA 2024.11 or newer.
-- Releases now include a ZIP for HACS, allowing it to show download counts.
-  The README badge shows the total downloads across release assets.
+- Releases include a ZIP for HACS download counts. Fixed the README badge,
+  which shows the total downloads across release assets. Release testing and
+  packaging run without write access; only the separate ZIP upload job can
+  write to the repository.
 - Added Python tests for the minimum and current HA test environments, browser
   tests for the card, linting and packaging checks. These run in CI and again
   before a release ZIP is uploaded. The release tag must match the manifest
-  version. Hassfest checks are still included.
+  version. Coverage includes Bluetooth recovery, firmware differences and the
+  Home Assistant device registry. Hassfest checks are still included.
 
 ## Installation
 
@@ -131,19 +149,6 @@ A connected Volcano uses one proxy connection slot.
 
 For manual installation, copy `custom_components/volcano_integration` from this
 repository into `/config/custom_components/`, then follow steps 2 and 3.
-
-### Updating from 3.2.4
-
-Update through HACS, restart Home Assistant and refresh your browser or Companion
-app. **You don't need to delete or re-add your Volcano.** Your devices and all
-19 existing entities keep their IDs, and the action names haven't changed. Any
-names you've set yourself are kept too. Vibration and Temperature unit appear as
-new configuration controls.
-
-You'll need Home Assistant **2024.11 or newer**. If any scripts set auto-shutoff
-below 30 minutes, update them to use the **30–360 minute** range. Failed commands
-and timeouts now stop the script with an error.
-Disconnect now turns off heat and air before closing Bluetooth.
 
 ## Controls
 
@@ -164,10 +169,26 @@ On the device page:
 
 Press **Connect** to connect to the Volcano. If it isn't available, the integration
 keeps trying, leaving more time between attempts. **Disconnect** stops the retries
-or, if connected, turns off the heater and pump before disconnecting. Both are
-checked before the connection closes. If either fails, you'll get an error and
-the connection stays open so you can retry. If Bluetooth has already dropped,
-check the physical controls: Home Assistant can't turn them off without a connection.
+or, if connected, turns off the heater and pump before disconnecting. If they're
+already confirmed off on this connection, no new status notification is needed.
+If the firmware only sends status when it changes and has sent none since connecting,
+Disconnect waits up to ten seconds, then closes Bluetooth if both OFF commands were
+acknowledged. A Home Assistant notification asks you to check heat and air on the device.
+Otherwise, failed commands or unconfirmed shutdown leave the connection open with an
+error so you can retry. If Bluetooth has already dropped, check the physical controls:
+Home Assistant can't turn them off without a connection.
+
+The target temperature control rounds to a whole degree in the Volcano's display
+unit. If HA shows °C while the Volcano uses °F, setting 177 °C sends 351 °F
+(177.2 °C). The `set_temperature` action always rounds to whole °C.
+
+If the firmware can't report its display unit, or only reports it when it changes,
+the temperature controls use whole °C until a unit arrives. The card shows
+"Device unit not reported; using °C." It switches to the device's unit as soon as
+the device reports it. If you select a unit before the device has reported one,
+an acknowledged change is accepted after ten seconds without a notification. Later
+updates from the device take precedence. The selector is unavailable on firmware
+without a unit register.
 
 ### Hybrid dashboard card
 
@@ -396,8 +417,7 @@ pytest -q --timeout=30
 ```
 
 To test the minimum Home Assistant version, use a separate Python 3.12 environment
-with `requirements-test-min.txt`. Tests simulate Bluetooth; changes to device
-commands also need checking on a real Volcano.
+with `requirements-test-min.txt`.
 
 Card tests and a local preview use Node 22 and pnpm 10:
 
@@ -413,11 +433,11 @@ The preview runs at `http://127.0.0.1:8765` with a simulated device.
 ### Releases
 
 Set the version in `custom_components/volcano_integration/manifest.json` and use
-a matching GitHub tag, such as `v4.0.0`. Publishing a release runs the checks,
+a matching GitHub tag, such as `v4.0.1`. Publishing a release runs the checks,
 builds `volcano_integration.zip` and attaches it to the release. Check that the
 workflow succeeds and the asset is attached before announcing it.
 
-For a local ZIP, run `python scripts/package_release.py --tag v4.0.0`. The output
+For a local ZIP, run `python scripts/package_release.py --tag v4.0.1`. The output
 is `dist/volcano_integration.zip`.
 
 HACS uses release-asset download counts. The README badge totals downloads across

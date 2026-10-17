@@ -283,7 +283,8 @@ class VolcanoHybridCard extends HTMLElement {
   }
 
   _state(role) { return this._hass?.states[this._entities[role]]; }
-  _unit() { return unit(this._state("current")?.attributes.device_temperature_unit) || unit(this._state("target")?.attributes.device_temperature_unit); }
+  _deviceUnit() { return unit(this._state("current")?.attributes.device_temperature_unit) || unit(this._state("target")?.attributes.device_temperature_unit); }
+  _unit() { return this._deviceUnit() || unit(this._state("target")?.attributes.temperature_unit_fallback); }
   _connected() { return this._state("connection")?.state === "CONNECTED"; }
   _connecting() {
     const connection = this._state("connection");
@@ -345,6 +346,7 @@ class VolcanoHybridCard extends HTMLElement {
     else if (connecting) status = "Connecting… Tap power to cancel.";
     else if (!connected) status = "Bluetooth disconnected · Tap power to connect";
     else if (!displayUnit) status = "Device temperature unit unavailable. Reconnect the Volcano to read its setting.";
+    else if (!this._deviceUnit()) status = "Device unit not reported; using °C.";
     const statusElement = root.querySelector(".status");
     statusElement.textContent = status;
     statusElement.classList.toggle("error", Boolean(this._error || this._registryError));

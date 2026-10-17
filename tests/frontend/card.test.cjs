@@ -382,3 +382,28 @@ test("desktop panel screenshot", async () => {
     await page.locator("volcano-hybrid-card").screenshot({ path: `${process.env.SCREENSHOT_DIR}/volcano-hybrid-panel.png` });
   }
 });
+
+
+test("explicit Celsius fallback enables controls until the device reports its unit", async () => {
+  await page.evaluate(() => {
+    demo.setDeviceUnit(null);
+    demo.hass.config.unit_system.temperature = "°F";
+    demo.update("target", "356", { unit_of_measurement: "°F", min: 104, max: 446, temperature_unit_fallback: "C" });
+  });
+  assert.match(await stateText(), /Target temperature: 180 degrees Celsius/);
+  assert.match(await page.locator("volcano-hybrid-card .status").textContent(), /Device unit not reported; using °C/);
+  assert.equal(await button("increase").isDisabled(), false);
+  assert.equal(await button("decrease").isDisabled(), false);
+  await button("increase").click();
+  assert.equal(await page.evaluate(() => demo.calls[0].data.value), 357.8);
+  assert.match(await stateText(), /Target temperature: 181 degrees Celsius/);
+  await page.evaluate(() => {
+    demo.setDeviceUnit("F");
+    demo.update("target", "356", { temperature_unit_fallback: null });
+  });
+  assert.equal(await page.locator("volcano-hybrid-card .status").textContent(), "");
+  assert.match(await stateText(), /Target temperature: 356 degrees Fahrenheit/);
+  await button("increase").click();
+  assert.equal(await page.evaluate(() => demo.calls[1].data.value), 357);
+  assert.match(await stateText(), /Target temperature: 357 degrees Fahrenheit/);
+});

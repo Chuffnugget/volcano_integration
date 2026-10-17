@@ -14,6 +14,7 @@ class VolcanoState:
     current_temperature: float | None = None
     target_temperature: float | None = None
     temperature_unit: str | None = None
+    temperature_unit_fallback: str | None = None
     heat_state: bool | None = None
     pump_state: bool | None = None
     raw_status: str | None = None

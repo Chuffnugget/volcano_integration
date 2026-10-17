@@ -21,6 +21,10 @@ class VolcanoTemperatureUnit(VolcanoEntity, SelectEntity):
         super().__init__(manager, entry, "temperature_unit")
 
     @property
+    def available(self) -> bool:
+        return super().available and self.manager.supports_temperature_unit
+
+    @property
     def current_option(self) -> str | None:
         unit = self.manager.state.temperature_unit
         return f"°{unit}" if unit else None

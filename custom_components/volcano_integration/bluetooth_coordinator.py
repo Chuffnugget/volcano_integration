@@ -8,7 +8,9 @@ from dataclasses import replace
 from typing import Any
 
 from bleak import BleakClient, BleakError
-from bleak_retry_connector import establish_connection
+from bleak.exc import BleakCharacteristicNotFoundError
+from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
+from homeassistant.components import persistent_notification
 from homeassistant.components.bluetooth import async_ble_device_from_address
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -36,12 +38,14 @@ from .const import (
     UUID_BLE_FIRMWARE_VERSION,
     UUID_FIRMWARE_VERSION,
     UUID_HEAT_OFF,
+    UUID_HEAT_ON,
     UUID_HEATER_SETPOINT,
     UUID_HOURS_OF_OPERATION,
     UUID_LED_BRIGHTNESS,
     UUID_MINUTES_OF_OPERATION,
     UUID_PUMP_NOTIFICATIONS,
     UUID_PUMP_OFF,
+    UUID_PUMP_ON,
     UUID_SERIAL_NUMBER,
     UUID_TEMP,
 )
@@ -84,7 +88,8 @@ class VolcanoBTManager:
         self.bt_address = bt_address
         self._config_entry_id = config_entry_id
         self.state = VolcanoState()
-        self._client: BleakClient | None = None
+        self._client: BleakClientWithServiceCache | None = None
+        self._use_services_cache = True
         self._run_task: asyncio.Task | None = None
         self._requested = False
         self._closed = False
@@ -96,6 +101,10 @@ class VolcanoBTManager:
         self._listeners: set[Callable[[], None]] = set()
         self._generation = 0
         self._status_sequence = 0
+        self._status_received = False
+        self._unit_write_acknowledged = False
+        self._outputs_notified_off = False
+        self._unit_notification_received = False
         self._unit_sequence = 0
         self._temperature_sequence = 0
         self._temperature_read_at: float | None = None
@@ -115,6 +124,16 @@ class VolcanoBTManager:
     @property
     def connection_requested(self) -> bool:
         return self._requested
+
+    @property
+    def supports_temperature_unit(self) -> bool:
+        """Whether this connection can report the physical display unit."""
+        if self._client is None:
+            return False
+        characteristic = self._client.services.get_characteristic(REGISTER2_UUID)
+        return characteristic is not None and bool(
+            {"read", "notify"}.intersection(characteristic.properties)
+        )
 
     @callback
     def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -144,11 +163,16 @@ class VolcanoBTManager:
     def _invalidate(self) -> None:
         """Never let readings from an old connection satisfy a workflow wait."""
         self._temperature_read_at = None
+        self._status_received = False
+        self._unit_write_acknowledged = False
+        self._outputs_notified_off = False
+        self._unit_notification_received = False
         self._publish(
             bt_status=BT_STATUS_DISCONNECTED,
             current_temperature=None,
             target_temperature=None,
             temperature_unit=None,
+            temperature_unit_fallback=None,
             heat_state=None,
             pump_state=None,
             raw_status=None,
@@ -176,12 +200,13 @@ class VolcanoBTManager:
     async def async_user_disconnect(self) -> None:
         """Turn off both outputs before disconnecting, or cancel a pending connection."""
         async with self._lifecycle_lock:
+            shutdown_confirmed = True
             if self.connected:
                 try:
                     async with self._io_lock:
                         if not self.connected:
                             raise HomeAssistantError("Volcano is no longer connected")
-                        await self._turn_off_outputs()
+                        shutdown_confirmed = await self._turn_off_outputs()
                         # Reject commands already queued behind these off writes before
                         # releasing the I/O lock and cancelling the connection worker.
                         self._requested = False
@@ -193,13 +218,33 @@ class VolcanoBTManager:
                         detail = "Bluetooth was lost. Check heat and air on the Volcano itself."
                     raise HomeAssistantError(f"{err}. {detail}") from err
             await self._stop_locked()
+            if not shutdown_confirmed:
+                message = (
+                    "Both OFF commands were acknowledged, but this Volcano did not report "
+                    "its heat or air status. Bluetooth has been disconnected. "
+                    "Check that heat and air are off on the device."
+                )
+                _LOGGER.warning("Volcano %s: %s", self.bt_address, message)
+                persistent_notification.async_create(
+                    self.hass,
+                    message,
+                    title="Volcano: check heat and air",
+                    notification_id=f"{DOMAIN}_{self._config_entry_id}_shutdown_unconfirmed",
+                )
 
-    async def _turn_off_outputs(self) -> None:
-        """Attempt both off writes, then confirm fresh status while holding the I/O lock."""
+    async def _turn_off_outputs(self) -> bool:
+        """Turn both outputs off; return whether their status confirmed shutdown."""
+        confirmation_sequence = self._status_sequence
+        already_off = (
+            self._outputs_notified_off
+            and self.state.heat_state is False
+            and self.state.pump_state is False
+        )
         errors = []
+        acknowledgements = []
         for name, uuid in (("heat", UUID_HEAT_OFF), ("air", UUID_PUMP_OFF)):
             try:
-                await self._write(uuid, b"\x00")
+                acknowledgements.append(await self._write(uuid, b"\x00"))
             except (HomeAssistantError, *CONNECTION_ERRORS) as err:
                 errors.append(f"{name}: {err}")
         if errors:
@@ -208,18 +253,52 @@ class VolcanoBTManager:
         try:
             async with asyncio.timeout(IO_TIMEOUT):
                 while True:
+                    changed = self._changed
                     sequence = self._status_sequence
                     data = await self._read_optional(UUID_PUMP_NOTIFICATIONS)
-                    if data is None:
-                        raise HomeAssistantError("Heat and air status is unavailable")
-                    if sequence == self._status_sequence:
+                    if data is not None and sequence == self._status_sequence:
                         self._update_status(data)
                     if not self.connected:
                         raise HomeAssistantError("Volcano disconnected before confirming shutdown")
-                    if self.state.heat_state is False and self.state.pump_state is False:
-                        return
-                    await asyncio.sleep(0.1)
+                    fresh_status = data is not None or self._status_sequence > confirmation_sequence
+                    if (
+                        fresh_status
+                        and self.state.heat_state is False
+                        and self.state.pump_state is False
+                    ):
+                        return True
+                    if data is None:
+                        characteristic = self._client.services.get_characteristic(
+                            UUID_PUMP_NOTIFICATIONS
+                        )
+                        if characteristic is None or "notify" not in characteristic.properties:
+                            raise HomeAssistantError("Heat and air status is unavailable")
+                        # Notify-only firmware may send nothing when already off.
+                        # Only trust an off notification from this connection, with no
+                        # intervening ON command or contradictory status.
+                        if (
+                            already_off
+                            and self._outputs_notified_off
+                            and self.state.heat_state is False
+                            and self.state.pump_state is False
+                        ):
+                            return True
+                        # Notifications run without the I/O lock. Keep queued commands
+                        # blocked until a fresh status confirms both outputs are off.
+                        await changed.wait()
+                    else:
+                        await asyncio.sleep(0.1)
         except TimeoutError as err:
+            if self.connected and not self._status_received and all(acknowledgements):
+                characteristic = self._client.services.get_characteristic(UUID_PUMP_NOTIFICATIONS)
+                if (
+                    characteristic is not None
+                    and "notify" in characteristic.properties
+                    and "read" not in characteristic.properties
+                ):
+                    # An idle notify-only device may never send its first status.
+                    # Both acknowledged OFF writes are required for this fallback.
+                    return False
             raise HomeAssistantError("Volcano did not confirm that heat and air are off") from err
 
     async def async_shutdown(self) -> None:
@@ -268,6 +347,12 @@ class VolcanoBTManager:
                         polls += 1
                         with suppress(TimeoutError):
                             await asyncio.wait_for(self._disconnected.wait(), TEMP_POLL_INTERVAL)
+                except BleakCharacteristicNotFoundError as err:
+                    _LOGGER.debug(
+                        "Volcano %s has incomplete Bluetooth services: %s", self.bt_address, err
+                    )
+                    async with self._io_lock:
+                        await self._clear_service_cache()
                 except CONNECTION_ERRORS as err:
                     _LOGGER.debug("Volcano %s unavailable: %s", self.bt_address, err)
                 finally:
@@ -304,11 +389,17 @@ class VolcanoBTManager:
             # 30-second deadline used to interrupt those retries. User Disconnect
             # and unload can still cancel this worker immediately.
             self._client = await establish_connection(
-                BleakClient,
+                BleakClientWithServiceCache,
                 device,
                 self.bt_address,
                 disconnected_callback=self._on_disconnect,
+                use_services_cache=self._use_services_cache,
             )
+            # A connection can succeed with an incomplete cached service table.
+            # Do not enter a retry loop that keeps accepting the same table.
+            for uuid in (UUID_TEMP, UUID_PUMP_NOTIFICATIONS):
+                if self._client.services.get_characteristic(uuid) is None:
+                    raise BleakCharacteristicNotFoundError(uuid)
             self._generation += 1
             await self._read_temperature()
             await self._read_setpoint()
@@ -338,7 +429,21 @@ class VolcanoBTManager:
             await self._read_temperature_unit()
             if not client.is_connected or self._disconnected.is_set():
                 raise BleakError("Disconnected during initialization")
+            self._use_services_cache = True
             self._publish(bt_status=BT_STATUS_CONNECTED)
+
+    async def _clear_service_cache(self) -> None:
+        """Discard incomplete services before the worker disconnects and retries."""
+        self._use_services_cache = False
+        self._disconnected.set()
+        self._invalidate()
+        if self._client is None:
+            return
+        try:
+            async with asyncio.timeout(IO_TIMEOUT):
+                await self._client.clear_cache()
+        except (BleakError, TimeoutError, OSError, EOFError) as err:
+            _LOGGER.debug("Volcano Bluetooth service cache could not be cleared: %s", err)
 
     @callback
     def _on_disconnect(self, client: BleakClient) -> None:
@@ -352,34 +457,48 @@ class VolcanoBTManager:
         if client is self._client and not self._disconnected.is_set():
             self._status_sequence += 1
             self._update_status(data)
+            self._outputs_notified_off = (
+                self.state.heat_state is False and self.state.pump_state is False
+            )
 
     @callback
     def _unit_notification(self, client: BleakClient, data: bytearray) -> None:
         if client is self._client and not self._disconnected.is_set():
             self._unit_sequence += 1
+            self._unit_notification_received = True
             self._update_temperature_unit(data)
 
     @callback
     def _update_temperature_unit(self, data: bytes | bytearray | None) -> None:
+        self._unit_write_acknowledged = False
         try:
             unit = decode_temperature_unit(data) if data is not None else None
         except ProtocolError:
             unit = None
-        self._publish(temperature_unit=unit)
+        self._publish(temperature_unit=unit, temperature_unit_fallback=None)
 
     async def _read_temperature_unit(self) -> None:
         sequence = self._unit_sequence
         data = await self._read_optional(REGISTER2_UUID)
         if sequence == self._unit_sequence and not self._disconnected.is_set():
-            self._update_temperature_unit(data)
+            if data is not None:
+                self._update_temperature_unit(data)
+            elif not self._unit_notification_received and not self._unit_write_acknowledged:
+                # The wire format is always Celsius. Use it until notify-only
+                # firmware reports a unit, without claiming its display uses C.
+                self._publish(temperature_unit=None, temperature_unit_fallback="C")
 
     @callback
     def _update_status(self, data: bytes | bytearray) -> None:
+        self._status_received = True
         try:
             status = decode_status(data)
         except ProtocolError:
+            self._outputs_notified_off = False
             self._publish(heat_state=None, pump_state=None, raw_status=data.hex())
         else:
+            if status.heat or status.pump:
+                self._outputs_notified_off = False
             self._publish(heat_state=status.heat, pump_state=status.pump, raw_status=status.raw)
 
     async def _disconnect(self) -> None:
@@ -447,17 +566,25 @@ class VolcanoBTManager:
         if data is not None:
             self._publish(target_temperature=decode_temperature(data))
 
-    async def _write(self, uuid: str, payload: bytes) -> None:
+    async def _write(self, uuid: str, payload: bytes) -> bool:
+        """Write a command and return whether the device acknowledged it."""
         characteristic = self._client.services.get_characteristic(uuid)
         if characteristic is None:
             raise HomeAssistantError(f"Volcano characteristic {uuid} is unavailable")
         if not {"write", "write-without-response"}.intersection(characteristic.properties):
             raise HomeAssistantError(f"Volcano characteristic {uuid} is not writable")
-        # Preserve the device's advertised write mode, but make it explicit.
+        if uuid in (UUID_HEAT_ON, UUID_PUMP_ON):
+            # An earlier OFF notification cannot confirm a later shutdown once
+            # an ON command has been sent, even if its notification is delayed.
+            self._outputs_notified_off = False
+        # A write without response is sent, but not acknowledged by the device.
+        acknowledged = "write" in characteristic.properties
         async with asyncio.timeout(IO_TIMEOUT):
-            await self._client.write_gatt_char(
-                characteristic, payload, response="write" in characteristic.properties
-            )
+            await self._client.write_gatt_char(characteristic, payload, response=acknowledged)
+        if uuid in (UUID_HEAT_ON, UUID_PUMP_ON):
+            # An OFF notification delivered during the write can precede the ON.
+            self._outputs_notified_off = False
+        return acknowledged
 
     async def _command(self, operation: Callable, **updates: Any) -> tuple[int, int]:
         """Serialize all commands with polling; failed writes never look successful."""
@@ -521,10 +648,40 @@ class VolcanoBTManager:
         payload = encode_temperature_unit(unit)
 
         async def write_register() -> None:
-            await self._write(REGISTER2_UUID, payload)
+            acknowledged = await self._write(REGISTER2_UUID, payload)
             await self._read_temperature_unit()
-            if self.state.temperature_unit != unit:
-                raise HomeAssistantError("Volcano did not confirm the temperature unit")
+            if self.state.temperature_unit == unit:
+                return
+            characteristic = self._client.services.get_characteristic(REGISTER2_UUID)
+            if (
+                characteristic is not None
+                and "notify" in characteristic.properties
+                and "read" not in characteristic.properties
+            ):
+                # Notifications do not take the I/O lock, so confirmation can
+                # arrive while other commands remain queued behind this change.
+                try:
+                    async with asyncio.timeout(IO_TIMEOUT):
+                        while True:
+                            changed = self._changed
+                            if not self.connected:
+                                raise HomeAssistantError(
+                                    "Volcano disconnected while confirming the temperature unit"
+                                )
+                            if self.state.temperature_unit == unit:
+                                return
+                            await changed.wait()
+                except TimeoutError as err:
+                    if self.connected and acknowledged and not self._unit_notification_received:
+                        # Selecting the existing unit need not produce a notification.
+                        # Use the acknowledged setting until the device reports one.
+                        self._unit_write_acknowledged = True
+                        self._publish(temperature_unit=unit, temperature_unit_fallback=None)
+                        return
+                    raise HomeAssistantError(
+                        "Volcano did not confirm the temperature unit"
+                    ) from err
+            raise HomeAssistantError("Volcano did not confirm the temperature unit")
 
         await self._command(write_register)
 

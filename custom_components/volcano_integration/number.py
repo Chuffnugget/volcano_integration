@@ -87,7 +87,9 @@ class VolcanoNumber(VolcanoEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         if self.entity_description.key == "temperature":
-            unit = self.manager.state.temperature_unit
+            unit = (
+                self.manager.state.temperature_unit or self.manager.state.temperature_unit_fallback
+            )
             if unit is None:
                 raise HomeAssistantError(
                     "Volcano temperature unit is unknown; reconnect the device"
@@ -101,5 +103,8 @@ class VolcanoNumber(VolcanoEntity, NumberEntity):
     @property
     def extra_state_attributes(self):
         if self.entity_description.key == "temperature":
-            return {"device_temperature_unit": self.manager.state.temperature_unit}
+            return {
+                "device_temperature_unit": self.manager.state.temperature_unit,
+                "temperature_unit_fallback": self.manager.state.temperature_unit_fallback,
+            }
         return None

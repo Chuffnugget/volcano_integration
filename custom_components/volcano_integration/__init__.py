@@ -102,11 +102,15 @@ def _resolve_manager(hass: HomeAssistant, call: ServiceCall) -> VolcanoBTManager
         if len(device_ids) != 1:
             raise ServiceValidationError("Select exactly one Volcano device")
         device = dr.async_get(hass).async_get(device_ids[0])
-        matches = [
-            manager
-            for entry_id, manager in managers.items()
-            if device is not None and entry_id in device.config_entries
-        ]
+        entry_ids = ()
+        if device is not None:
+            # HA 2026.8 assigns each device to one entry; older HA exposes a set.
+            entry_ids = (
+                (device.config_entry_id,)
+                if hasattr(device, "config_entry_id")
+                else device.config_entries
+            )
+        matches = [manager for entry_id, manager in managers.items() if entry_id in entry_ids]
     else:
         matches = list(managers.values())
     if len(matches) != 1:
