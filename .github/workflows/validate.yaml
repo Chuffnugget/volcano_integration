@@ -4,10 +4,11 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: "0 0 * * *"       # runs daily at midnight UTC
-  workflow_dispatch:         # allows manual runs
+    - cron: "23 4 * * *"
+  workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   validate-hacs:
@@ -17,4 +18,4 @@ jobs:
         uses: hacs/action@main
         with:
           category: "integration"
-          # ignore: "description topics"   # optionally ignore checks
+          comment: false

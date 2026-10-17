@@ -27,6 +27,8 @@ def test_release_archive_and_version(tmp_path):
             "diagnostics.py",
             "switch.py",
             "www/volcano-hybrid-card.js",
+            "brand/icon.png",
+            "brand/icon@2x.png",
         } <= set(release.namelist())
         assert not any(
             name.startswith("custom_components/") or "__pycache__" in name
