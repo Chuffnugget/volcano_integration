@@ -19,7 +19,7 @@ after you close the app on your phone.
 
 ## What's new in v4.0.0
 
-Changes since [3.2.4](https://github.com/Chuffnugget/volcano_integration/releases/tag/v3.2.4).
+Changes since [v3.2.4](https://github.com/Chuffnugget/volcano_integration/releases/tag/v3.2.4).
 
 <img src="images/volcano-hybrid-card.png" alt="Volcano Hybrid dashboard card" width="420">
 
