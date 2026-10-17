@@ -1,9 +1,9 @@
 # Storz & Bickel Volcano Hybrid Integration for Home Assistant
 
-[![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/default/tree/master/integration/Chuffnugget-volcano_integration)
+[![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/default/blob/master/integration)
 [![Release downloads](https://img.shields.io/github/downloads/Chuffnugget/volcano_integration/total?label=release%20downloads)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![HACS Action](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml)
-[![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yaml)
+[![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml)
 [![Release](https://img.shields.io/github/v/release/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![License](https://img.shields.io/github/license/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/blob/master/LICENSE)
 [![PayPal.Me](https://img.shields.io/badge/PayPal.Me-chuffnugget-00457C?logo=paypal)](https://www.paypal.me/chuffnugget)
@@ -379,6 +379,10 @@ Pull requests and bug reports are welcome.
 The `test_*.py` files are automated tests run by pytest. Card tests use Playwright
 in a browser. GitHub Actions runs both on pushes and pull requests, and before
 uploading a release ZIP. They aren't installed or run on your Home Assistant.
+
+HACS and hassfest also validate the integration on pushes, pull requests and
+daily. Both can be run manually from the Actions tab. Dependabot checks for
+GitHub Actions updates each week and opens a pull request when updates are available.
 
 Run the Python tests on Linux or WSL with Python 3.14:
 
