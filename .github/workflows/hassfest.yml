@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  hassfest:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v7.0.1"

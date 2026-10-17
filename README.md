@@ -3,7 +3,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/default/blob/master/integration)
 [![Release downloads](https://img.shields.io/github/downloads/Chuffnugget/volcano_integration/total?label=release%20downloads)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![HACS Action](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/validate.yaml)
-[![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yaml)
+[![hassfest](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Chuffnugget/volcano_integration/actions/workflows/hassfest.yml)
 [![Release](https://img.shields.io/github/v/release/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/releases)
 [![License](https://img.shields.io/github/license/Chuffnugget/volcano_integration)](https://github.com/Chuffnugget/volcano_integration/blob/master/LICENSE)
 [![PayPal.Me](https://img.shields.io/badge/PayPal.Me-chuffnugget-00457C?logo=paypal)](https://www.paypal.me/chuffnugget)
