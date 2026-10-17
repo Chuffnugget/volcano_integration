@@ -1,40 +1,92 @@
 connect:
   description: "Connect to the Volcano device."
   fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
     wait_until_connected:
       name: "Wait Until Connected"
       description: "Whether to block until the device is fully connected."
       required: false
-      default: false
+      default: true
       selector:
         boolean: {}
+    timeout:
+      name: "Connection Timeout"
+      description: "Seconds to wait for connection and initial reads. Used only when waiting is enabled. Retries continue after timeout; use Disconnect to stop them."
+      default: 180
+      selector:
+        number:
+          min: 1
+          max: 900
+          step: 1
+          unit_of_measurement: "s"
 
 disconnect:
-  description: "Disconnect from the Volcano device."
-  fields: {}
+  description: "Turn off heat and air, confirm they are off, then disconnect Bluetooth. If still connecting, cancel the connection and retries."
+  fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
 
 pump_on:
   description: "Turn the Volcano's pump on."
-  fields: {}
+  fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
 
 pump_off:
   description: "Turn the Volcano's pump off."
-  fields: {}
+  fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
 
 heat_on:
   description: "Turn the Volcano's heater on."
-  fields: {}
+  fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
 
 heat_off:
   description: "Turn the Volcano's heater off."
-  fields: {}
+  fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
 
 set_temperature:
   description: "Set the temperature of the Volcano vaporizer."
   fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
     temperature:
       name: "Temperature"
-      description: "The target temperature in °C (40-230)."
+      description: "The target temperature in whole °C (40-230). Fractional input is rounded to the nearest degree."
       required: true
       example: 170
       selector:
@@ -46,7 +98,7 @@ set_temperature:
     wait_until_reached:
       name: "Wait Until Reached"
       description: "Whether to block until the target temperature is reached."
-      required: true
+      required: false
       default: true
       selector:
         boolean: {}
@@ -54,6 +106,12 @@ set_temperature:
 set_auto_shutoff_setting:
   description: "Set the Auto Shutoff Setting for the Volcano in minutes."
   fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
     minutes:
       name: "Minutes"
       description: "Auto Shutoff delay, in minutes."
@@ -61,14 +119,20 @@ set_auto_shutoff_setting:
       default: 30
       selector:
         number:
-          min: 1
-          max: 240
+          min: 30
+          max: 360
           step: 1
           unit_of_measurement: "min"
 
 set_led_brightness:
   description: "Set the LED Brightness of the Volcano (0-100)."
   fields:
+    device_id:
+      name: Device
+      description: Optional when exactly one Volcano is loaded.
+      selector:
+        device:
+          integration: volcano_integration
     brightness:
       name: "Brightness"
       description: "The LED brightness percentage (0-100)."

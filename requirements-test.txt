@@ -1,0 +1,5 @@
+pytest-homeassistant-custom-component==0.13.372
+ruff==0.17.0
+aiousbwatcher==1.1.2
+serialx==1.11.0
+home-assistant-frontend==20260930.3

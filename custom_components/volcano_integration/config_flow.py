@@ -1,119 +1,70 @@
-"""config_flow.py - Volcano Integration for Home Assistant."""
-import logging
-import asyncio
+"""Use Home Assistant's shared Bluetooth discovery, including remote proxies."""
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.components import bluetooth
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
 
 from .const import DOMAIN
-from bleak import BleakScanner
-
-_LOGGER = logging.getLogger(__name__)
 
 REFRESH_OPTION_VALUE = "REFRESH_DEVICE_LIST"
 
+
 class VolcanoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Volcano Integration."""
+    """Configure one entry per Bluetooth address without opening another scanner."""
 
     VERSION = 2
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
-    def __init__(self):
-        """Initialize the config flow."""
-        self._discovered_devices = {}
-
-    async def async_step_user(self, user_input=None) -> FlowResult:
-        """Handle the initial step of the config flow."""
-        _LOGGER.debug("Initiating Volcano Integration config flow.")
-
+    async def async_step_user(self, user_input=None):
+        discovered = bluetooth.async_discovered_service_info(self.hass, connectable=True)
+        devices = {
+            info.address: info for info in discovered if "VOLCANO" in (info.name or "").upper()
+        }
+        errors = {}
         if user_input is not None:
-            selected_address = user_input.get("selected_device")
-
-            if selected_address == REFRESH_OPTION_VALUE:
-                _LOGGER.debug("User requested to refresh device list.")
-                return await self.async_step_user()
-
-            selected_device = self._discovered_devices.get(selected_address)
-
-            if selected_device:
-                return self.async_create_entry(
-                    title=selected_device.name or selected_address,
-                    data={
-                        "bt_address": selected_address,
-                        "device_name": selected_device.name or "Volcano Vaporizer",
-                    },
-                )
-            else:
-                return self.async_abort(reason="device_not_found")
-
-        # Discover Bluetooth devices
-        devices = await self._discover_bluetooth_devices()
-
-        if not devices:
-            return self.async_abort(reason="no_devices_found")
-
-        # Map devices by address for easy lookup
-        self._discovered_devices = {device.address: device for device in devices}
-
-        # Create a list of dictionaries for the selector
+            address = user_input.get("bt_address") or user_input.get("selected_device")
+            if address and address != REFRESH_OPTION_VALUE:
+                try:
+                    address = cv.matches_regex(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")(
+                        address.strip()
+                    )
+                except vol.Invalid:
+                    errors["base"] = "invalid_address"
+                else:
+                    await self.async_set_unique_id(address.upper())
+                    self._abort_if_unique_id_configured()
+                    # Entries made before unique IDs were introduced must also deduplicate.
+                    if any(
+                        entry.data.get("bt_address", "").upper() == address.upper()
+                        for entry in self._async_current_entries()
+                    ):
+                        return self.async_abort(reason="already_configured")
+                    info = next(
+                        (info for key, info in devices.items() if key.upper() == address.upper()),
+                        None,
+                    )
+                    return self.async_create_entry(
+                        title=info.name if info else "Volcano Vaporizer",
+                        data={
+                            "bt_address": address.upper(),
+                            "device_name": info.name if info else "Volcano Vaporizer",
+                        },
+                    )
         options = [
-            {"label": device.name or device.address, "value": device.address}
-            for device in devices
+            {"label": f"{info.name} ({address})", "value": address}
+            for address, info in devices.items()
         ]
-
-        # Add a 'Refresh device list' option
-        options.append({"label": "Refresh Device List", "value": REFRESH_OPTION_VALUE})
-
-        selector = SelectSelector(
-            SelectSelectorConfig(
-                options=options,
-                mode=SelectSelectorMode.DROPDOWN,
-                custom_value=False,
-            )
-        )
-
+        options.append({"label": "Refresh device list", "value": REFRESH_OPTION_VALUE})
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required("selected_device"): selector
+                    vol.Optional("selected_device"): SelectSelector(
+                        SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN)
+                    ),
+                    vol.Optional("bt_address"): cv.string,
                 }
             ),
-            errors={},
+            errors=errors,
         )
-
-    async def _discover_bluetooth_devices(self, timeout: int = 10):
-        """Discover Bluetooth devices using BleakScanner."""
-        _LOGGER.debug("Starting Bluetooth device discovery for %s seconds...", timeout)
-        try:
-            devices = await BleakScanner.discover(timeout=timeout)
-            _LOGGER.debug("Discovered %d Bluetooth devices.", len(devices))
-            # Optionally, filter devices by name or other criteria here
-            return devices
-        except Exception as e:
-            _LOGGER.error("Error during Bluetooth device discovery: %s", e)
-            return []
-
-    async def async_step_import(self, import_data):
-        """Handle configuration by YAML import."""
-        return await self.async_step_user()
-
-    @staticmethod
-    async def async_get_options_flow(config_entry):
-        """Options flow handler."""
-        return VolcanoOptionsFlowHandler(config_entry)
-
-class VolcanoOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Volcano Integration options."""
-
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input=None):
-        """Manage the Volcano options."""
-        _LOGGER.debug("Initiating options flow.")
-        return self.async_create_entry(title="", data=user_input or {})

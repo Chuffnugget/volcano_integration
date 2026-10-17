@@ -3,12 +3,10 @@
   "name": "Volcano Integration",
   "codeowners": ["@Chuffnugget"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["bluetooth_adapters", "frontend", "http", "lovelace"],
   "documentation": "https://github.com/Chuffnugget/volcano_integration",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Chuffnugget/volcano_integration/issues",
-  "requirements": [
-    "bleak>=0.20.0"
-  ],
-  "version": "3.2.4"
+  "requirements": [],
+  "version": "4.0.0"
 }

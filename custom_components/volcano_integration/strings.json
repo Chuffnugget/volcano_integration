@@ -1,0 +1,27 @@
+{
+  "title": "Volcano Integration",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect a Volcano Hybrid",
+        "description": "Choose a discovered Volcano or enter its Bluetooth address. Bluetooth must be enabled on the device. You can connect it after setup using the Connect button.",
+        "data": {
+          "selected_device": "Discovered device",
+          "bt_address": "Bluetooth address (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_address": "Enter a Bluetooth address such as AA:BB:CC:DD:EE:FF."
+    },
+    "abort": {
+      "already_configured": "This Volcano is already configured."
+    }
+  },
+  "issues": {
+    "legacy_configuration": {
+      "title": "Set up the legacy Volcano entry again",
+      "description": "The entry {name} uses an old configuration format that cannot be migrated safely: early versions could control a different Bluetooth address from the one stored in the entry. Back up your configuration and note the entity IDs used in automations. Verify your Volcano's Bluetooth address, remove this legacy entry in Settings > Devices & services, then add Volcano Integration again with that address. Check your automation and dashboard references afterwards. Entries from version 3.2.4 do not require this step."
+    }
+  }
+}

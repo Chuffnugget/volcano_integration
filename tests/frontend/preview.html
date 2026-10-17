@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Volcano Hybrid · Control panel preview</title>
+<style>
+  body { margin:0; background:#edece8; color:#242925; font-family:system-ui,sans-serif; }
+  main { max-width:560px; margin:48px auto; padding:0 20px; }
+  .eyebrow { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#68706a; }
+  h1 { font-size:29px; letter-spacing:-1px; font-weight:600; margin:10px 0 24px; }
+  p { font-size:13px; line-height:1.7; color:#686d69; }
+  footer { display:flex; gap:8px; margin-top:22px; }
+  footer button { border:1px solid #bbbeb8; background:transparent; padding:9px 14px; border-radius:20px; color:#424a43; cursor:pointer; }
+  @media(max-width:500px) { main { padding:0 12px; margin:28px auto; } }
+</style>
+<main>
+  <div class="eyebrow">Volcano Hybrid · Home Assistant</div>
+  <h1>Volcano Hybrid card</h1>
+  <volcano-hybrid-card></volcano-hybrid-card>
+  <p>Preview with a simulated Volcano. Adjust the target or toggle HEAT and AIR. The card follows the device's temperature unit.</p>
+  <footer><button id="offline">Simulate disconnection</button><button id="restore">Reset preview</button></footer>
+</main>
+<script type="module">
+  import "/card.js";
+  import { setup } from "/fixture.js";
+  window.demo = setup(document.querySelector("volcano-hybrid-card"));
+  document.querySelector("#offline").onclick = () => demo.update("connection", "DISCONNECTED");
+  document.querySelector("#restore").onclick = () => { window.demo = setup(document.querySelector("volcano-hybrid-card")); };
+</script>
+</html>

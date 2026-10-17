@@ -1,0 +1,9 @@
+{
+  "name": "volcano-hybrid-card-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/frontend/card.test.cjs",
+    "preview": "node scripts/card_preview.cjs"
+  },
+  "devDependencies": { "playwright": "1.62.1" }
+}

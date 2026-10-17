@@ -1,0 +1,15 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+# These workflow APIs wrap asyncio.timeout and translate expiry to an HA error.
+"custom_components/volcano_integration/bluetooth_coordinator.py" = ["ASYNC109"]

@@ -1,0 +1,17 @@
+# Minimum supported HA, using its own Bluetooth platform versions.
+homeassistant==2024.11.3
+pytest-homeassistant-custom-component==0.13.184
+ruff==0.17.0
+bleak==0.22.3
+bleak-retry-connector==3.6.0
+bluetooth-adapters==0.20.2
+bluetooth-auto-recovery==1.4.2
+bluetooth-data-tools==1.20.0
+dbus-fast==2.24.3
+habluetooth==3.6.0
+pyudev==0.24.1
+pyserial==3.5
+# Old HA's dependencies predate these packages' breaking major releases.
+josepy==1.14.0
+pycares==4.4.0
+home-assistant-frontend==20241106.2
