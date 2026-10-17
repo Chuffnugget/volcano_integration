@@ -17,7 +17,7 @@ switch the heater and air pump, and run workflows as Home Assistant scripts.
 Home Assistant keeps the Bluetooth connection open, so a workflow can continue
 after you close the app on your phone.
 
-## What's new in 4.0.0
+## What's new in v4.0.0
 
 Changes since [3.2.4](https://github.com/Chuffnugget/volcano_integration/releases/tag/v3.2.4).
 
