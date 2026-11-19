@@ -21,6 +21,7 @@ from custom_components.volcano_integration.const import (
     UUID_PUMP_NOTIFICATIONS,
     UUID_PUMP_OFF,
     UUID_PUMP_ON,
+    UUID_TEMP,
 )
 
 from .conftest import connect_manager, drain
@@ -151,6 +152,21 @@ async def test_malformed_brightness_is_unknown(manager, peripheral, raw):
     await connect_manager(manager)
     assert manager.state.led_brightness is None
     assert manager.connected
+
+
+async def test_cold_volcano_temperature_is_unknown_while_connected(hass, integration, peripheral):
+    registry = er.async_get(hass)
+    current_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, "volcano_current_temperature_AA:BB:CC:DD:EE:FF"
+    )
+    status_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, "volcano_bt_status_AA:BB:CC:DD:EE:FF"
+    )
+    peripheral.values[UUID_TEMP] = bytes.fromhex("ffff")
+    await connect_manager(integration)
+    await hass.async_block_till_done()
+    assert hass.states.get(current_id).state == "unknown"
+    assert hass.states.get(status_id).state == "CONNECTED"
 
 
 async def test_shutdown_prevents_late_service_from_restarting(hass, integration, peripheral):

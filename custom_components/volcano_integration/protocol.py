@@ -26,11 +26,18 @@ def decode_uint(data: bytes | bytearray, size: int = 2) -> int:
     return int.from_bytes(data[:size], "little")
 
 
-def decode_temperature(data: bytes | bytearray) -> float:
-    """Temperatures are unsigned tenths of a degree Celsius."""
+def decode_reported_temperature(data: bytes | bytearray) -> float | None:
+    """Temperatures are unsigned tenths of a degree Celsius; the sentinel means no reading."""
     value = decode_uint(data) / 10
-    # The official app rejects Math.round(value) >= 6536.
-    if value >= 6535.5:
+    # The official app rejects Math.round(value) >= 6536. The Volcano reports
+    # 0xFFFF once it cools below its 40 °C range, which isn't a broken link.
+    return None if value >= 6535.5 else value
+
+
+def decode_temperature(data: bytes | bytearray) -> float:
+    """A temperature that must be real, such as one that can complete a workflow."""
+    value = decode_reported_temperature(data)
+    if value is None:
         raise ProtocolError("Device reported an invalid temperature sentinel")
     return value
 

@@ -53,6 +53,7 @@ from .models import VolcanoState
 from .protocol import (
     ProtocolError,
     decode_brightness,
+    decode_reported_temperature,
     decode_status,
     decode_temperature,
     decode_temperature_unit,
@@ -556,7 +557,8 @@ class VolcanoBTManager:
                 registry.async_update_device(device.id, sw_version=firmware)
 
     async def _read_temperature(self) -> None:
-        value = decode_temperature(await self._read(UUID_TEMP))
+        # Waits ignore None, so a cold Volcano can't complete a temperature workflow.
+        value = decode_reported_temperature(await self._read(UUID_TEMP))
         self._temperature_sequence += 1
         self._temperature_read_at = asyncio.get_running_loop().time()
         self._publish(current_temperature=value)
@@ -564,7 +566,7 @@ class VolcanoBTManager:
     async def _read_setpoint(self) -> None:
         data = await self._read_optional(UUID_HEATER_SETPOINT)
         if data is not None:
-            self._publish(target_temperature=decode_temperature(data))
+            self._publish(target_temperature=decode_reported_temperature(data))
 
     async def _write(self, uuid: str, payload: bytes) -> bool:
         """Write a command and return whether the device acknowledged it."""
