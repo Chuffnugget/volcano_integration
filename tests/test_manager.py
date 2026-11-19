@@ -146,6 +146,62 @@ async def test_wait_requires_a_new_sample(manager, peripheral):
     await waiter
 
 
+@pytest.mark.parametrize("raw", ["ffff", "4bff"])
+@pytest.mark.parametrize(
+    ("uuid", "field"),
+    [(UUID_TEMP, "current_temperature"), (UUID_HEATER_SETPOINT, "target_temperature")],
+)
+async def test_cold_volcano_connects_without_a_reading(manager, peripheral, ble, raw, uuid, field):
+    """Below 40 °C the Volcano reports a sentinel instead of a temperature."""
+    peripheral.values[uuid] = bytes.fromhex(raw)
+    await connect_manager(manager)
+    assert manager.connected
+    assert getattr(manager.state, field) is None
+    assert ble.await_count == 1
+    peripheral.disconnect.assert_not_awaited()
+
+
+async def test_cooling_below_range_keeps_the_connection(manager, peripheral, monkeypatch):
+    monkeypatch.setattr(
+        "custom_components.volcano_integration.bluetooth_coordinator.TEMP_POLL_INTERVAL", 0.001
+    )
+    await connect_manager(manager)
+    peripheral.values[UUID_TEMP] = bytes.fromhex("ffff")
+    async with asyncio.timeout(1):
+        while manager.state.current_temperature is not None:
+            await manager._changed.wait()
+    sequence = manager._temperature_sequence
+    async with asyncio.timeout(1):
+        while manager._temperature_sequence <= sequence:
+            await manager._changed.wait()
+    assert manager.connected
+    peripheral.disconnect.assert_not_awaited()
+    peripheral.values[UUID_TEMP] = (400).to_bytes(2, "little")
+    async with asyncio.timeout(1):
+        while manager.state.current_temperature != 40:
+            await manager._changed.wait()
+    assert manager.connected
+    assert manager._generation == 1
+
+
+async def test_unreported_temperature_cannot_satisfy_a_wait(manager, peripheral):
+    await connect_manager(manager)
+    await manager.set_heater_temperature(170)
+    peripheral.values[UUID_TEMP] = bytes.fromhex("ffff")
+    waiter = asyncio.create_task(
+        manager.wait_for_temperature(170, manager._generation, manager._temperature_sequence)
+    )
+    async with manager._io_lock:
+        await manager._read_temperature()
+    await drain()
+    assert not waiter.done()
+    assert manager.connected
+    peripheral.values[UUID_TEMP] = (1700).to_bytes(2, "little")
+    async with manager._io_lock:
+        await manager._read_temperature()
+    await asyncio.wait_for(waiter, 1)
+
+
 @pytest.mark.parametrize("late_response", [False, True])
 async def test_wait_aborts_when_connection_drops(manager, peripheral, late_response):
     await connect_manager(manager)

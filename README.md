@@ -386,6 +386,9 @@ the physical controls to turn off the heater and pump.
   and device unit refresh about every five polls. Unit changes also use device
   notifications when available. Other settings and operating-time counters
   refresh about once a minute while connected.
+- **Current temperature unknown:** the Volcano doesn't report a temperature below
+  40 °C (104 °F), so it shows as unknown and the card shows dashes. Bluetooth stays
+  connected, so you can still turn the heat on from Home Assistant.
 
 For connection problems, enable debug logging for
 `custom_components.volcano_integration`. The integration's **Download diagnostics**

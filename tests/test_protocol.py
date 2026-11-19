@@ -4,6 +4,7 @@ import pytest
 
 from custom_components.volcano_integration.protocol import (
     ProtocolError,
+    decode_reported_temperature,
     decode_status,
     decode_temperature,
     decode_text,
@@ -52,12 +53,24 @@ def test_short_read_rejected(data):
         decode_status(data)
     with pytest.raises(ProtocolError):
         decode_temperature(data)
+    with pytest.raises(ProtocolError):
+        decode_reported_temperature(data)
 
 
 @pytest.mark.parametrize("raw", ["ffff", "4bff"])
 def test_invalid_temperature_cannot_satisfy_a_workflow(raw):
     with pytest.raises(ProtocolError):
         decode_temperature(bytes.fromhex(raw))
+
+
+@pytest.mark.parametrize("raw", ["ffff", "4bff"])
+def test_unreported_temperature_is_not_a_reading(raw):
+    assert decode_reported_temperature(bytes.fromhex(raw)) is None
+
+
+def test_reported_temperature_keeps_valid_readings():
+    assert decode_reported_temperature(bytes.fromhex("a406")) == 170
+    assert decode_reported_temperature(bytes.fromhex("4aff")) == 6535.4
 
 
 @pytest.mark.parametrize("value", [39, 39.9, 230.1, 231, float("nan"), float("inf")])
