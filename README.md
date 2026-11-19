@@ -17,6 +17,21 @@ switch the heater and air pump, and run workflows as Home Assistant scripts.
 Home Assistant keeps the Bluetooth connection open, so a workflow can continue
 after you close the app on your phone.
 
+## What's new in v4.0.2
+
+- Hold − or + to adjust the temperature, with configurable acceleration. The card
+  batches device writes and updates the digits in place to reduce lag.
+- Optional brightness, auto-shutoff, vibration and Stop all controls, configurable
+  through the card editor or YAML.
+- Script buttons with start/stop controls, running status, ordering and individual
+  visibility. Stop all cancels selected scripts and automation runs before turning
+  off heat and air. Automations stay enabled.
+- Tap the target to enter a temperature, or use named preset buttons. Both follow
+  the Volcano's °C or °F setting. Extra controls can start collapsed.
+- Fixed cold-temperature readings causing repeated Bluetooth disconnections.
+- Fixed auto-shutoff rounding when HA displays another time unit, and kept Stop all
+  protected against conflicting commands while the card is edited or reloaded.
+
 ## What's new in v4.0.1
 
 <img src="images/volcano-hybrid-card.png" alt="Volcano Hybrid dashboard card" width="420">
@@ -546,11 +561,11 @@ The preview runs at `http://127.0.0.1:8765` with a simulated device.
 ### Releases
 
 Set the version in `custom_components/volcano_integration/manifest.json` and use
-a matching GitHub tag, such as `v4.0.1`. Publishing a release runs the checks,
+a matching GitHub tag, such as `v4.0.2`. Publishing a release runs the checks,
 builds `volcano_integration.zip` and attaches it to the release. Check that the
 workflow succeeds and the asset is attached before announcing it.
 
-For a local ZIP, run `python scripts/package_release.py --tag v4.0.1`. The output
+For a local ZIP, run `python scripts/package_release.py --tag v4.0.2`. The output
 is `dist/volcano_integration.zip`.
 
 HACS uses release-asset download counts. The README badge totals downloads across

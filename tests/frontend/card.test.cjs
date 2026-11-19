@@ -418,6 +418,54 @@ async function holdButton(name) {
   await page.mouse.down();
 }
 
+test("temperature updates reuse the display segments instead of rebuilding both screens", async () => {
+  const result = await page.evaluate(() => {
+    const root = demo.card.shadowRoot;
+    const current = [...root.querySelectorAll("g.current path")];
+    const target = [...root.querySelectorAll("g.target path")];
+    const originalTarget = root.querySelector("g.target").innerHTML;
+    for (let value = 181; value <= 195; value++) demo.update("target", String(value));
+    for (let value = 181; value <= 185; value++) demo.update("current", String(value));
+    return {
+      currentRetained: current.every((node, index) => node === root.querySelectorAll("g.current path")[index]),
+      targetRetained: target.every((node, index) => node === root.querySelectorAll("g.target path")[index]),
+      targetChanged: originalTarget !== root.querySelector("g.target").innerHTML,
+      text: root.querySelector(".temperatures").textContent,
+    };
+  });
+  assert.equal(result.currentRetained, true);
+  assert.equal(result.targetRetained, true);
+  assert.equal(result.targetChanged, true);
+  assert.match(result.text, /Current temperature: 185. Target temperature: 195/);
+});
+
+test("an accelerated hold limits device writes and flushes the final selection on release", async () => {
+  await page.clock.install();
+  await page.evaluate(() => {
+    demo.update("target", "80");
+    demo.card.setConfig({ device: "volcano-one", temperature_acceleration: 300 });
+    const send = demo.hass.callService;
+    demo.sentAt = [];
+    demo.hass.callService = (...args) => { demo.sentAt.push(performance.now()); return send(...args); };
+  });
+  await holdButton("increase");
+  await page.clock.runFor(4000);
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  const held = await page.evaluate(() => ({
+    sentAt: demo.sentAt.slice(),
+    selected: Number(demo.card.shadowRoot.querySelector(".temperatures").textContent.match(/Target temperature: (\d+)/)[1]),
+  }));
+  assert.ok(held.selected > 120, "the preview must keep accelerating between device writes");
+  assert.ok(held.sentAt.length <= 15, `too many writes during a four-second hold: ${held.sentAt.length}`);
+  held.sentAt.slice(1).forEach((time, index) => assert.ok(time - held.sentAt[index] >= 299));
+  await page.mouse.up();
+  await page.waitForFunction(() => !demo.card._targetRequest && !demo.card._busy);
+  assert.equal(await page.evaluate(() => demo.calls.at(-1).data.value), held.selected);
+  const count = await page.evaluate(() => demo.calls.length);
+  await page.clock.runFor(1000);
+  assert.equal(await page.evaluate(() => demo.calls.length), count);
+});
+
 for (const direction of ["increase", "decrease"]) {
   test(`mouse hold repeats ${direction} and release adds no extra step`, async () => {
     await page.clock.install();
@@ -425,13 +473,58 @@ for (const direction of ["increase", "decrease"]) {
     assert.equal(await page.evaluate(() => demo.calls.length), 1);
     await page.clock.runFor(900);
     const values = await page.evaluate(() => demo.calls.map(call => call.data.value));
-    assert.ok(values.length >= 4);
-    values.forEach((value, index) => assert.equal(value, 180 + (direction === "increase" ? 1 : -1) * (index + 1)));
+    const selected = await page.locator("volcano-hybrid-card g.target").getAttribute("data-value");
+    const step = direction === "increase" ? 1 : -1;
+    assert.ok(values.length >= 2);
+    assert.equal(values[0], 180 + step);
+    values.slice(1).forEach((value, index) => assert.ok((value - values[index]) * step > 0));
     await page.mouse.up();
     await page.clock.runFor(2000);
-    assert.equal(await page.evaluate(() => demo.calls.length), values.length);
+    assert.equal(await page.evaluate(() => demo.calls.at(-1).data.value), Number(selected));
+    assert.ok(await page.evaluate(() => demo.calls.length) <= values.length + 1);
+    assert.equal(await page.locator("volcano-hybrid-card g.target").getAttribute("data-value"), selected);
     assert.equal(await page.locator("volcano-hybrid-card .status").textContent(), "");
   });
+}
+
+for (const deviceUnit of ["C", "F"]) {
+  for (const direction of ["increase", "decrease"]) {
+    test(`a long ${deviceUnit} ${direction} hold stays smooth across delayed confirmations`, async () => {
+      await page.clock.install();
+      await page.evaluate(({ deviceUnit, direction }) => {
+        demo.update("target", direction === "increase" ? "80" : "180");
+        demo.setDeviceUnit(deviceUnit);
+        demo.confirm = false;
+        const send = demo.hass.callService;
+        demo.hass.callService = async (...args) => {
+          await send(...args);
+          setTimeout(() => demo.update("target", String(Math.round(args[2].value * 10) / 10)), 2200);
+        };
+        demo.displayChanges = [];
+        const target = demo.card.shadowRoot.querySelector("g.target");
+        new MutationObserver(() => demo.displayChanges.push({ time: performance.now(), value: Number(target.dataset.value) }))
+          .observe(target, { attributes: true, attributeFilter: ["data-value"] });
+      }, { deviceUnit, direction });
+      await holdButton(direction);
+      await page.clock.runFor(6500);
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+      const { changes, calls, selected } = await page.evaluate(() => ({
+        changes: demo.displayChanges, calls: demo.calls.length,
+        selected: Number(demo.card.shadowRoot.querySelector("g.target").dataset.value),
+      }));
+      assert.ok(changes.length > 60);
+      assert.ok(calls <= 4, "slow confirmations must not create a backlog of commands");
+      changes.slice(1).forEach((change, index) => {
+        assert.equal(change.value - changes[index].value, direction === "increase" ? 1 : -1);
+        assert.ok(change.time - changes[index].time <= (index === 0 ? 450 : 180), "device updates must not pause the preview");
+      });
+      await page.mouse.up();
+      await page.clock.runFor(5000);
+      assert.equal(Number(await page.locator("volcano-hybrid-card g.target").getAttribute("data-value")), selected);
+      assert.equal(await page.evaluate(() => Boolean(demo.card._targetRequest || demo.card._busy || demo.card._pending)), false);
+      assert.equal(await page.locator("volcano-hybrid-card .status").textContent(), "");
+    });
+  }
 }
 
 test("holding during a slow service previews the final target and sends only that target next", async () => {
@@ -519,11 +612,16 @@ for (const ending of ["touchEnd", "touchCancel"]) {
     const box = await button("increase").boundingBox();
     await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
     await page.clock.runFor(900);
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
     const count = await page.evaluate(() => demo.calls.length);
-    assert.ok(count >= 4);
+    const selected = Number(await page.locator("volcano-hybrid-card g.target").getAttribute("data-value"));
+    assert.ok(selected >= 185);
+    assert.ok(count >= 2);
     await session.send("Input.dispatchTouchEvent", { type: ending, touchPoints: [] });
     await page.clock.runFor(2000);
-    assert.equal(await page.evaluate(() => demo.calls.length), count);
+    assert.ok(await page.evaluate(() => demo.calls.length) <= count + 1);
+    assert.equal(await page.evaluate(() => demo.calls.at(-1).data.value), selected);
+    assert.equal(Number(await page.locator("volcano-hybrid-card g.target").getAttribute("data-value")), selected);
     assert.equal(await page.evaluate(() => demo.card._hold), null);
     await session.detach();
   });
@@ -587,6 +685,28 @@ for (const change of ["disconnect", "unit", "entity", "rename", "config", "remov
     assert.equal(await page.evaluate(() => demo.calls.length), 1);
     assert.equal(await page.evaluate(() => Boolean(demo.card._hold || demo.card._targetRequest || demo.card._pending)), false);
     assert.equal(await page.locator("volcano-hybrid-card .status").count() > 0 ? await page.locator("volcano-hybrid-card .status").evaluate(el => el.classList.contains("error")) : false, false);
+  });
+}
+
+for (const change of ["disconnect", "unit", "config", "remove", "stop_all"]) {
+  test(`${change} cancels a scheduled hold write before it reaches the device`, async () => {
+    await page.clock.install();
+    await page.evaluate(() => demo.card.setConfig({ device: "volcano-one", show_stop_all: true }));
+    await holdButton("increase");
+    await page.clock.runFor(550);
+    await page.evaluate(kind => {
+      if (!demo.card._targetSendTimer) throw new Error("Expected a batched temperature write");
+      demo.sentBeforeCancel = demo.calls.filter(call => call.domain === "number").length;
+      if (kind === "disconnect") demo.update("connection", "DISCONNECTED");
+      if (kind === "unit") demo.setDeviceUnit("F");
+      if (kind === "config") demo.card.setConfig({ device: "volcano-two" });
+      if (kind === "remove") demo.card.remove();
+      if (kind === "stop_all") demo.card._stopAll();
+    }, change);
+    await page.mouse.up();
+    await page.clock.runFor(2000);
+    assert.equal(await page.evaluate(() => demo.calls.filter(call => call.domain === "number").length), await page.evaluate(() => demo.sentBeforeCancel));
+    assert.equal(await page.evaluate(() => Boolean(demo.card._hold || demo.card._targetRequest || demo.card._targetSendTimer)), false);
   });
 }
 

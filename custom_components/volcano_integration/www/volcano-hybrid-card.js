@@ -2,6 +2,7 @@
 const DOMAIN = "volcano_integration";
 const HOLD_DELAY = 400;
 const HOLD_INTERVAL = 120;
+const HOLD_SEND_INTERVAL = 300;
 const PRESET_TEMPERATURES = Array.from({ length: 13 }, (_, index) => 170 + index * 5);
 const EXTRA_OPTIONS = {
   show_brightness: "Show brightness",
@@ -141,13 +142,26 @@ const SEGMENT_PATHS = {
   g: "M5 30H25L29 34 25 38H5L1 34Z",
 };
 
-function digits(value) {
+function renderDigits(element, value) {
   const text = Number.isFinite(value) ? String(Math.round(value)).padStart(3, " ") : "---";
-  return [...text].slice(-3).map((digit, index) => {
-    const active = digit === "-" ? "g" : SEGMENTS[Number(digit)] || "";
-    return `<g transform="translate(${index * 44} 0)">${Object.entries(SEGMENT_PATHS).map(([key, path]) =>
-      `<path d="${path}" opacity="${digit !== " " && active.includes(key) ? 1 : 0.035}"/>`).join("")}</g>`;
-  }).join("");
+  const displayed = text.slice(-3);
+  if (element.dataset.value === displayed) return;
+  // Keep the SVG nodes alive during holds and incoming HA state updates.
+  if (!element.childElementCount) {
+    element.innerHTML = Array.from({ length: 3 }, (_, index) =>
+      `<g transform="translate(${index * 44} 0)">${Object.values(SEGMENT_PATHS).map(path =>
+        `<path d="${path}" opacity="0.035"/>`).join("")}</g>`).join("");
+  }
+  [...displayed].forEach((digit, index) => {
+    if (element.dataset.value?.[index] === digit) return;
+    const active = digit === "-" ? "g" : digit === " " ? "" : SEGMENTS[Number(digit)] || "";
+    Object.keys(SEGMENT_PATHS).forEach((key, segmentIndex) => {
+      const segment = element.children[index].children[segmentIndex];
+      const opacity = active.includes(key) ? "1" : "0.035";
+      if (segment.getAttribute("opacity") !== opacity) segment.setAttribute("opacity", opacity);
+    });
+  });
+  element.dataset.value = displayed;
 }
 
 function unit(value) {
@@ -601,6 +615,7 @@ class VolcanoHybridCard extends HTMLElement {
     event.preventDefault();
     button.focus({ preventScroll: true });
     button.setPointerCapture(event.pointerId);
+    this._lastTargetSend = null;
     const hold = this._hold = { button, pointerId: event.pointerId, started: performance.now() };
     const repeat = () => {
       if (this._hold !== hold) return;
@@ -620,11 +635,17 @@ class VolcanoHybridCard extends HTMLElement {
     if (!hold) return;
     clearTimeout(hold.timer);
     if (hold.button.hasPointerCapture(hold.pointerId)) hold.button.releasePointerCapture(hold.pointerId);
+    clearTimeout(this._targetSendTimer);
+    this._targetSendTimer = null;
+    // Send the final selection as soon as the current write is confirmed.
+    if (this._targetRequest) queueMicrotask(() => this._sendTemperature());
   }
 
   _cancelTemperature() {
     this._stopHold();
     this._targetRequest = null;
+    clearTimeout(this._targetSendTimer);
+    this._targetSendTimer = null;
     if (this._pending?.role === "target") {
       clearTimeout(this._confirmationTimer);
       this._pending = null;
@@ -745,6 +766,20 @@ class VolcanoHybridCard extends HTMLElement {
       this._render();
       return;
     }
+    // Preview every step, but coalesce held repeats to avoid flooding HA and BLE.
+    // Taps and the final value on release still send immediately.
+    const delay = this._hold && this._lastTargetSend != null
+      ? HOLD_SEND_INTERVAL - (performance.now() - this._lastTargetSend) : 0;
+    if (delay > 0) {
+      this._targetSendTimer ??= setTimeout(() => {
+        this._targetSendTimer = null;
+        this._sendTemperature();
+      }, delay);
+      return;
+    }
+    clearTimeout(this._targetSendTimer);
+    this._targetSendTimer = null;
+    this._lastTargetSend = performance.now();
     const converted = convert(request.value, request.displayUnit, request.sourceUnit);
     const value = Math.max(request.min, Math.min(request.max, Number(converted.toFixed(4))));
     const token = this._commandToken = {};
@@ -801,8 +836,8 @@ class VolcanoHybridCard extends HTMLElement {
     const root = this.shadowRoot;
     root.querySelector(".panel").classList.toggle("offline", !connected);
     root.querySelector(".panel").classList.toggle("heat-off", connected && this._state("heat")?.state === "OFF");
-    root.querySelector("g.current").innerHTML = digits(current);
-    root.querySelector("g.target").innerHTML = digits(target);
+    renderDigits(root.querySelector("g.current"), current);
+    renderDigits(root.querySelector("g.target"), target);
     root.querySelectorAll(".unit").forEach(element => { element.textContent = displayUnit ? `°${displayUnit}` : ""; });
     root.querySelector(".temperatures").textContent = `Current temperature: ${current == null ? "unavailable" : Math.round(current)}. Target temperature: ${target == null ? "unavailable" : Math.round(target)}${displayUnit ? ` degrees ${displayUnit === "C" ? "Celsius" : "Fahrenheit"}` : ". Device temperature unit unavailable"}.`;
     root.querySelector(".power-icon").classList.toggle("active", connected);
