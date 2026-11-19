@@ -34,6 +34,11 @@ from .const import (
     UUID_PUMP_ON,
 )
 from .protocol import normalize_setpoint
+from .stop_automation_runs import (
+    SERVICE_STOP_AUTOMATION_RUNS,
+    STOP_AUTOMATION_RUNS_SCHEMA,
+    async_stop_automation_runs,
+)
 
 _LOGGER = logging.getLogger(__name__)
 type VolcanoConfigEntry = ConfigEntry[VolcanoBTManager]
@@ -42,6 +47,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.SWITCH, Platform.SELECT]
 TARGET_SCHEMA = {vol.Optional("device_id"): vol.All(cv.ensure_list, [cv.string])}
 SERVICE_SCHEMAS = {
+    SERVICE_STOP_AUTOMATION_RUNS: STOP_AUTOMATION_RUNS_SCHEMA,
     "connect": vol.Schema(
         {
             **TARGET_SCHEMA,
@@ -148,6 +154,9 @@ async def _async_check_control_permission(
 
 
 async def _handle_service(hass: HomeAssistant, call: ServiceCall) -> None:
+    if call.service == SERVICE_STOP_AUTOMATION_RUNS:
+        await async_stop_automation_runs(hass, call)
+        return
     manager = _resolve_manager(hass, call)
     await _async_check_control_permission(hass, call, manager)
     if call.service == "connect":

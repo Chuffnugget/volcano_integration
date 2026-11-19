@@ -1,7 +1,7 @@
 /* Test-only Home Assistant facade. Never included in the HACS release. */
 export function setup(card, options = {}) {
-  const keys = { current: "current_temperature", target: "heater_temperature_setpoint", heat: "heat_status", air: "pump_status", connection: "bt_status" };
-  const ids = { current: "sensor.renamed_current", target: "number.renamed_target", heat: "sensor.renamed_heat", air: "sensor.renamed_air", connection: "sensor.renamed_bluetooth" };
+  const keys = { current: "current_temperature", target: "heater_temperature_setpoint", heat: "heat_status", air: "pump_status", connection: "bt_status", brightness: "led_brightness_number", shutoff: "auto_shutoff_minutes", vibration: "vibration" };
+  const ids = { current: "sensor.renamed_current", target: "number.renamed_target", heat: "sensor.renamed_heat", air: "sensor.renamed_air", connection: "sensor.renamed_bluetooth", brightness: "number.renamed_brightness", shutoff: "number.renamed_shutoff", vibration: "switch.renamed_vibration" };
   const registry = Object.entries(ids).map(([role, entity_id]) => ({
     entity_id, device_id: "volcano-one", platform: "volcano_integration", unique_id: `volcano_${keys[role]}_aa:bb:cc:dd:ee:ff`, disabled_by: null,
   }));
@@ -16,6 +16,9 @@ export function setup(card, options = {}) {
       [ids.heat]: { state: "OFF", attributes: {} },
       [ids.air]: { state: "OFF", attributes: {} },
       [ids.connection]: { state: "CONNECTED", attributes: {} },
+      [ids.brightness]: { state: "80", attributes: { min: 0, max: 100, step: 1, unit_of_measurement: "%" } },
+      [ids.shutoff]: { state: "120", attributes: { min: 30, max: 360, step: 1, unit_of_measurement: "min" } },
+      [ids.vibration]: { state: "off", attributes: {} },
     },
     config: { unit_system: { temperature: "°C" } },
     devices: { "volcano-one": { id: "volcano-one", identifiers: [["volcano_integration", "aa:bb:cc:dd:ee:ff"]] } },
@@ -30,9 +33,20 @@ export function setup(card, options = {}) {
     callService: async (domain, service, data) => {
       calls.push({ domain, service, data });
       if (demo.failure) throw new Error(demo.failure);
+      const failure = demo.failures?.[data.entity_id] || demo.failures?.[service];
+      if (failure) throw new Error(failure);
       if (demo.pause) await new Promise(resolve => { demo.resume = resolve; });
       if (!demo.confirm) return;
-      if (service === "set_value") {
+      if (domain === "volcano_integration" && service === "stop_automation_runs") {
+        hass.states[data.entity_id].attributes.current = 0;
+      }
+      if (service === "turn_on" || service === "turn_off") {
+        hass.states[data.entity_id].state = service === "turn_on" ? "on" : "off";
+        if (domain === "script") hass.states[data.entity_id].attributes.current = service === "turn_on" ? 1 : 0;
+      }
+      if (service === "set_value" && !hass.states[data.entity_id].attributes.device_temperature_unit) {
+        hass.states[data.entity_id].state = String(data.value);
+      } else if (service === "set_value") {
         const state = hass.states[data.entity_id];
         // HA converts to native Celsius; the integration rounds in the device's unit.
         const fahrenheit = state.attributes.unit_of_measurement === "°F";

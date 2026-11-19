@@ -144,3 +144,17 @@ set_led_brightness:
           max: 100
           step: 1
           unit_of_measurement: "%"
+
+stop_automation_runs:
+  name: Stop automation runs
+  description: "Cancel the selected automations' current runs and queued actions. Their enabled state and triggers stay unchanged."
+  fields:
+    entity_id:
+      name: Automations
+      description: "Choose the automations whose current runs should stop. Future triggers can start them again."
+      required: true
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: automation

@@ -197,7 +197,12 @@ without a unit register.
 Edit your dashboard, choose **Add card → Volcano Hybrid**, and select your device.
 The card is included. You don't need to install anything else or add a resource.
 
-- **− / +** lowers or raises the target by 1 °C or 1 °F, matching the Volcano.
+- **− / +** lowers or raises the target by 1 °C or 1 °F, matching the Volcano. Hold either button to
+  keep adjusting, or tap repeatedly. The selected target appears immediately;
+  the status message stays visible until the device confirms it.
+- **Tap the target temperature** to type a whole-degree value, then choose
+  **Set temperature**. The entry uses the Volcano's unit and full supported
+  range: 40–230 °C or 104–446 °F. Cancel or Escape leaves it unchanged.
 - **HEAT / AIR** turns the heater or pump on and off. The button lights up when on.
 - **Power** connects to the Volcano. When connected, it turns off heat and air
   before disconnecting. Tap it while connecting to cancel.
@@ -216,11 +221,115 @@ see dashes. Errors appear below the panel.
 Open the card editor to change the panel, display, button and status colours.
 Each colour has its own picker. **Reset colours** restores the original appearance.
 
+The editor also has a **Temperature button acceleration** setting, defaulting to
+**100%**. Holding − or + starts repeating after 0.4 seconds, then speeds up as you
+keep holding. Higher percentages reach the fastest rate sooner; **0%** keeps a
+steady rate. The range is 0–300%. Every step is still one device degree, and
+pending changes are combined so a long hold doesn't queue dozens of Bluetooth writes.
+
+You can enable any of these below the panel. They're hidden by default:
+
+- **Temperature presets:** buttons from 170 to 230 °C in 5 °C steps. With the
+  Volcano in Fahrenheit, those same temperatures show as 338–446 °F in 9 °F
+  steps. Choose which buttons appear and give them optional names in the editor.
+- **Brightness:** a display-brightness slider with − / + buttons. Dragging the
+  slider sends the new value when you release it.
+- **Auto shutoff:** edit the delay using the number field.
+- **Vibration:** turn it on or off.
+- **Script buttons:** run your Volcano scripts and see which are running.
+- **Stop all:** stop heat and air while leaving Bluetooth connected. It also
+  cancels any temperature adjustments queued by this card.
+
+For **Stop all**, select as many scripts and automations as you like in the
+editor. It cancels their current runs and queued actions, then turns off heat
+and air. Scripts can be started again, and automations keep their existing
+enabled state and triggers. A new trigger can start an automation again after
+you press Stop all. If an action fails, the card still tries the others and
+shows the error.
+
+Turn on **Show script buttons** to add buttons for the scripts in that same
+**Related scripts and automations** list. All its scripts are shown initially.
+Use the checkboxes to hide individual buttons, **Select all** to show or hide
+them together, and the up/down arrows to arrange them. These settings only
+change the buttons; hidden scripts are still included in Stop all. Automations
+in the list are Stop all targets and don't get run buttons.
+
+Buttons use the scripts' names from Home Assistant and show **Running** while
+active. A running script’s button becomes **Stop**, cancelling just that script's current and
+queued runs. This does not turn off heat or air that the script has already
+switched on; **Stop all** does that. Buttons work while Bluetooth is disconnected, so a script can include its own Connect action.
+They start scripts without inputs; scripts needing inputs should have a separate
+wrapper script that supplies them.
+
+Turn on **Collapse extra controls** to start with the extra controls folded
+away. Tap the heading to open or close them. It shows how many related scripts
+are running, and ordinary state updates don't close it. The main panel and
+status message stay visible.
+
+Presets are always stored in Celsius, independent of Home Assistant's display
+unit. For example, the 185 °C preset displays and sends 365 °F when the Volcano
+uses Fahrenheit. The Hybrid's maximum is 230 °C / 446 °F. The main − / + buttons
+still adjust by one degree in the Volcano's unit.
+
+The extra controls find their entities from the selected Volcano. If an entity
+is disabled or unavailable, its control is disabled too.
+
 For YAML dashboards:
 
 ```yaml
 type: custom:volcano-hybrid-card
 device: YOUR_HOME_ASSISTANT_DEVICE_ID
+```
+
+All editor settings also work in YAML. For example, to show every extra control:
+
+```yaml
+type: custom:volcano-hybrid-card
+device: YOUR_HOME_ASSISTANT_DEVICE_ID
+temperature_acceleration: 100
+show_brightness: true
+show_auto_shutoff: true
+show_vibration: true
+show_stop_all: true
+show_script_buttons: true
+show_temperature_presets: true
+collapse_extras: false
+stop_all_entities:
+  - script.volcano_session
+  - automation.volcano_timer
+```
+
+Replace the example script and automation IDs with yours, or leave out
+`stop_all_entities` to stop only heat and air.
+
+For a custom button order or hidden buttons, add `script_buttons`. Only scripts
+in `stop_all_entities` appear. Scripts without an entry here are shown after the
+listed buttons, in their original order. `show` defaults to `true`:
+
+```yaml
+stop_all_entities:
+  - script.volcano_session
+  - script.volcano_cooldown
+  - script.volcano_cleanup
+show_script_buttons: true
+script_buttons:
+  - entity: script.volcano_cooldown
+  - entity: script.volcano_session
+  - entity: script.volcano_cleanup
+    show: false
+```
+
+To choose presets in YAML, list Celsius temperatures from 170 to 230 in steps
+of 5. They appear in the listed order; `name` is optional and `show` defaults to
+`true`. Omit `temperature_presets` for all 13 buttons, or use `[]` for none:
+
+```yaml
+show_temperature_presets: true
+temperature_presets:
+  - temperature: 180
+    name: Start
+  - temperature: 195
+    name: Finish
 ```
 
 Renamed entities and multiple Volcanos are supported.
@@ -243,6 +352,7 @@ have one.
 | `set_temperature` | `temperature`: 40–230 °C. `wait_until_reached`: defaults to `true`. |
 | `set_led_brightness` | `brightness`: 0–100%. |
 | `set_auto_shutoff_setting` | `minutes`: 30–360. |
+| `stop_automation_runs` | Required `entity_id`: one automation or a list. Cancels current runs without changing their enabled state; does not use `device_id`. |
 
 For example:
 

@@ -98,7 +98,8 @@ class VolcanoNumber(VolcanoEntity, NumberEntity):
             target = value * 9 / 5 + 32 if unit == "F" else value
             await self.manager.set_heater_temperature(target, unit=unit)
         else:
-            await getattr(self.manager, self.entity_description.setter)(int(value))
+            # HA unit conversion can leave a whole minute just below its integer.
+            await getattr(self.manager, self.entity_description.setter)(round(value))
 
     @property
     def extra_state_attributes(self):
@@ -106,5 +107,14 @@ class VolcanoNumber(VolcanoEntity, NumberEntity):
             return {
                 "device_temperature_unit": self.manager.state.temperature_unit,
                 "temperature_unit_fallback": self.manager.state.temperature_unit_fallback,
+            }
+        if self.entity_description.key == "shutoff":
+            # Keep the card precise when HA rounds converted hours and their limits.
+            return {
+                "native_value": self.native_value,
+                "native_min_value": self.native_min_value,
+                "native_max_value": self.native_max_value,
+                "native_step": self.native_step,
+                "native_unit_of_measurement": self.native_unit_of_measurement,
             }
         return None
